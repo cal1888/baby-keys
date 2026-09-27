@@ -15,6 +15,11 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Baby Keys">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/fraunces@5/full.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/dm-sans@5/index.css">
 <style>
@@ -24,10 +29,10 @@
     --serif: "Fraunces Variable", Fraunces, Georgia, serif;
     --sans: "DM Sans Variable", "DM Sans", system-ui, sans-serif;
   }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--sky); color: var(--ink); font-family: var(--sans); user-select: none; -webkit-user-select: none; touch-action: none; }
+  html, body { margin: 0; height: 100%; height: 100dvh; overflow: hidden; background: var(--sky); color: var(--ink); font-family: var(--sans); user-select: none; -webkit-user-select: none; touch-action: none; }
   body.playing { cursor: none; }
   body.playing.pointer, body.menu { cursor: auto; }
-  canvas { display: block; width: 100vw; height: 100vh; }
+  canvas { display: block; position: fixed; top: 0; left: 0; }
   button { font: inherit; color: inherit; }
   .serif { font-family: var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; }
   .caps { font-family: var(--serif); text-transform: uppercase; letter-spacing: .32em; font-weight: 400; }
@@ -40,11 +45,13 @@
   }
   #intro .spark { font-size: 28px; margin-bottom: 14px; animation: twinkle 2.4s ease-in-out infinite; }
   #title { font: 500 clamp(44px, 8.5vw, 112px)/1.02 var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; letter-spacing: -.01em; }
-  #title span { display: inline-block; white-space: pre; animation: bob 3s ease-in-out infinite; }
+  #title .word { display: inline-block; white-space: nowrap; }
+  #title .ch { display: inline-block; animation: bob 3s ease-in-out infinite; }
   #intro .rule { width: 48px; height: 1.5px; background: var(--cream); opacity: .7; margin: 26px 0 18px; }
   #intro .tag { font-size: clamp(11px, 1.3vw, 14px); color: var(--cream); opacity: .9; }
   #intro .foot-note { margin-top: 14px; font-size: 10px; opacity: .6; }
   #intro.gone { opacity: 0; transform: scale(1.08); }
+  body.menu #intro { opacity: 0; }
   @keyframes bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-.06em) rotate(-1deg); } }
   @keyframes twinkle { 0%, 100% { transform: scale(1) rotate(0); opacity: .9; } 50% { transform: scale(1.25) rotate(20deg); opacity: 1; } }
 
@@ -68,7 +75,7 @@
   }
   .overlay.open { opacity: 1; pointer-events: auto; }
   .card {
-    width: min(780px, 100%); max-height: calc(100vh - 32px); overflow: auto; box-sizing: border-box;
+    width: min(780px, 100%); max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow: auto; box-sizing: border-box;
     background: var(--paper); border-radius: 30px; padding: 34px; color: var(--ink);
     box-shadow: 0 24px 60px rgba(20,45,80,.35);
     transform: translateY(16px) scale(.97); transition: transform .45s cubic-bezier(.3,1.5,.5,1);
@@ -77,6 +84,9 @@
   .card h2 { margin: 0; font: 600 40px/1.05 var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; }
   .card .sub { margin: 8px 0 24px; color: var(--muted); font-size: 16px; font-weight: 500; }
   .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  #settings .card { display: flex; flex-direction: column; overflow: hidden; }
+  #settings .modes { overflow: auto; min-height: 0; padding: 4px; margin: -4px; touch-action: pan-y; }
+  #settings .foot { flex: none; }
   .mode {
     position: relative; text-align: left; cursor: pointer; padding: 18px 18px 20px; border-radius: 22px;
     border: 1.5px solid var(--line); background: #fff8e8; display: flex; flex-direction: column; gap: 8px;
@@ -96,6 +106,10 @@
   .mode[aria-pressed="true"] .age { display: none; }
   .foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px; flex-wrap: wrap; }
   .foot p { margin: 0; color: var(--muted); font-size: 13px; }
+  #settings .foot p { flex: 1; }
+  #install { margin-top: 0; }
+  .install-help { margin: 12px 0 0; padding: 12px 14px; border-radius: 14px; background: #fff8e8; border: 1.5px dashed var(--line); font-size: 14px; color: var(--ink); line-height: 1.45; }
+  .install-help b { font-weight: 700; }
   .cta {
     cursor: pointer; border: 1.5px solid var(--ink); border-radius: 99px; padding: 14px 32px; color: var(--ink); background: var(--yellow);
     font: 600 20px var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; box-shadow: 0 4px 0 var(--ink);
@@ -193,7 +207,18 @@
   }
 
   @media (max-width: 680px) {
-    .modes { grid-template-columns: 1fr; }
+    .modes { grid-template-columns: 1fr; gap: 10px; }
+    .mode { display: grid; grid-template-columns: 44px 1fr; column-gap: 14px; row-gap: 2px; align-items: center; padding: 12px 14px; }
+    .mode .icon { grid-row: span 2; width: 44px; height: 44px; font-size: 20px; }
+    .mode b { font-size: 19px; padding-right: 48px; }
+    .mode small { font-size: 13px; }
+    .mode .age, .mode .check { top: 12px; right: 12px; }
+    .card h2 { font-size: 30px; }
+    .card .sub { margin-bottom: 14px; }
+    .foot { margin-top: 14px; }
+    .foot p { display: none; }
+    .cta { width: 100%; }
+    #install { width: 100%; }
     .card { padding: 22px; border-radius: 26px; }
     .go-score { font-size: 100px; }
   }
@@ -216,7 +241,7 @@
 <div id="settings" class="overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title">
   <div class="card">
     <h2 id="settings-title">Baby Keys</h2>
-    <p class="sub">Pick a level. You can change it any time from the button in the corner.</p>
+    <p class="sub">Pick a level, then press play. Change it any time with the ⚙ button.</p>
     <div class="modes">
       <button class="mode" data-mode="free" style="--c:#ff7a9c">
         <span class="icon">✦</span><span class="age">1+</span><span class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f6c94f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>
@@ -236,6 +261,7 @@
     </div>
     <div class="foot">
       <p id="settings-note">Tip: press Esc to leave full screen.</p>
+      <button id="install" class="ghost" type="button" hidden>Add to home screen</button>
       <button id="play" class="cta">Let's play!</button>
     </div>
   </div>
@@ -271,6 +297,8 @@ const TAU = Math.PI * 2;
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[Math.floor(Math.random() * a.length)];
 const TOUCH_ONLY = matchMedia('(hover: none) and (pointer: coarse)').matches;
+const STANDALONE = matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches || navigator.standalone === true;
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 // ---------- Level (mode) ----------
 const MODES = ['free', 'find', 'challenge'];
@@ -282,7 +310,7 @@ if (!MODES.includes(mode)) mode = 'free';
 const INTRO = {
   free: TOUCH_ONLY ? 'Tap anywhere!' : 'Press any key!',
   find: 'Find the letter!',
-  challenge: 'Ready? Press a key!',
+  challenge: TOUCH_ONLY ? 'Ready? Tap to start!' : 'Ready? Press a key!',
 };
 function syncBodyMode() {
   document.body.classList.toggle('touch', TOUCH_ONLY);
@@ -292,11 +320,17 @@ function setTitle() {
   syncBodyMode();
   const t = document.getElementById('title');
   t.innerHTML = '';
-  [...INTRO[mode]].forEach((ch, i) => {
-    const s = document.createElement('span');
-    s.textContent = ch;
-    s.style.animationDelay = `${i * 0.12}s`;
-    t.appendChild(s);
+  let i = 0;
+  INTRO[mode].split(' ').forEach((word, w) => {
+    if (w) t.appendChild(document.createTextNode(' '));
+    const wd = document.createElement('span');
+    wd.className = 'word';                 // words stay whole; the line breaks between them
+    [...word].forEach(ch => {
+      const c = document.createElement('span');
+      c.className = 'ch'; c.textContent = ch; c.style.animationDelay = `${i++ * 0.12}s`;
+      wd.appendChild(c);
+    });
+    t.appendChild(wd);
   });
   document.getElementById('intro-sub').textContent = TOUCH_ONLY ? 'Tap, tap, tap' : 'Goes full screen · Esc to exit';
 }
@@ -308,16 +342,56 @@ const ctx = cv.getContext('2d');
 let W, H, dpr;
 function resize() {
   dpr = Math.min(devicePixelRatio || 1, 2);
-  W = innerWidth; H = innerHeight;
+  const vv = window.visualViewport;
+  W = Math.round(vv ? vv.width : innerWidth); H = Math.round(vv ? vv.height : innerHeight);
   cv.width = W * dpr; cv.height = H * dpr;
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  // keep the current bubble above the tiles/keyboard if the screen changed size
+  let gameState = null;
+  try { gameState = game; } catch { /* first call runs before the game state exists */ }
+  if (gameState && gameState.target) {
+    const g = game.target, bottom = TOUCH_ONLY && game.choices.length ? choiceLayout().y0 - 16 : H * 0.8;
+    g.x = Math.min(Math.max(g.x, g.r * 1.4), W - g.r * 1.4);
+    g.y = Math.min(Math.max(g.y, g.r * 1.4), bottom - g.r * 1.2);
+  }
 }
 addEventListener('resize', resize);
+window.visualViewport?.addEventListener('resize', resize);
+addEventListener('orientationchange', () => setTimeout(resize, 250));
 resize();
 
 // ---------- Audio ----------
 let ac, master, noiseBuf;
+// iPhones mute Web Audio when the silent switch is on. Declaring a "playback" session (Safari 17+)
+// and playing a silent looping <audio> element (older iOS) makes it behave like video sound instead.
+let unlockEl = null;
+function silentWav(seconds) {              // 8 kHz, 8-bit mono WAV of silence
+  const n = Math.round(8000 * seconds), buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+  const str = (o, t) => [...t].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true);
+  v.setUint16(32, 1, true); v.setUint16(34, 8, true); str(36, 'data'); v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+  return new Blob([buf], { type: 'audio/wav' });
+}
+function unlockMobileAudio() {
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
+  if (!unlockEl) {
+    unlockEl = document.createElement('audio');
+    unlockEl.setAttribute('playsinline', '');
+    unlockEl.loop = true;
+    unlockEl.src = URL.createObjectURL(silentWav(0.5));   // must have real length: an empty looping clip locks up the page
+  }
+  unlockEl.play?.().catch(() => {});
+  if (ac && ac.state !== 'running') ac.resume().catch(() => {});
+  // a one-sample buffer, played inside the tap, fully wakes the context on older iOS
+  if (ac) { const b = ac.createBuffer(1, 1, 22050), src = ac.createBufferSource(); src.buffer = b; src.connect(ac.destination); src.start(0); }
+}
+['touchend', 'click', 'keydown'].forEach(ev => addEventListener(ev, () => { initAudio(); unlockMobileAudio(); }, { capture: true, passive: true }));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && ac) ac.resume().catch(() => {}); });
+
 function initAudio() {
-  if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+  if (ac) { if (ac.state !== 'running') ac.resume().catch(() => {}); return; }
   ac = new (window.AudioContext || window.webkitAudioContext)();
   const comp = ac.createDynamicsCompressor();
   comp.threshold.value = -18; comp.ratio.value = 6;
@@ -441,7 +515,7 @@ function sparks(x, y, hue, { dots = 18, confetti = 10, twinkles = 6, speed = 1 }
 
 function burst(x, y, hue, { label = '', face = false, size = 1, quiet = false } = {}) {
   const r = Math.min(W, H) * rand(0.1, 0.14) * size;
-  pops.push({ x, y, hue, r, label, face, shape: pick(SHAPES), t: 0, life: quiet ? 3 : 2.2, rot: rand(-0.3, 0.3), seed: rand(0, 100), popped: false });
+  pops.push({ x, y, hue, r, label, face, quiet, shape: pick(SHAPES), t: 0, life: quiet ? 9 : 2.2, rot: rand(-0.3, 0.3), seed: rand(0, 100), popped: false });
   if (pops.length > 40) pops.splice(0, pops.length - 40);
   if (quiet) return;
   rings.push({ x, y, hue, t: 0, life: 0.8, maxR: r * 2.8, w: 14 });
@@ -449,6 +523,16 @@ function burst(x, y, hue, { label = '', face = false, size = 1, quiet = false } 
   flashes.push({ x, y, hue, t: 0, life: 0.6 });
   cloudBounce = 1;
   shake = Math.max(shake, 4 * size);
+}
+
+function popFloater(o) {
+  instruments.bubble(note(C4, Math.floor(rand(0, 8))));
+  tone(note(C5, Math.floor(rand(2, 7))), { t: 0.06, dur: 0.4, vol: 0.1 });
+  puff(o, 1.1);
+  sparks(o.x, o.y, 0, { dots: 16, confetti: 10, twinkles: 6 });
+  rings.push({ x: o.x, y: o.y, hue: 0, t: 0, life: 0.6, maxR: o.r * 2.4, w: 10 });
+  cloudBounce = 1; shake = Math.max(shake, 4);
+  pops.splice(pops.indexOf(o), 1);
 }
 
 // Little sparkle puff when a shape disappears
@@ -495,10 +579,12 @@ const POSTHOG_HOST = 'https://eu.i.posthog.com';
 const stats = { presses: 0, taps: 0, specials: 0, hits: 0, misses: 0, games: 0, startedAt: 0, sent: false };
 if (POSTHOG_KEY) {
   const s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/posthog-js@1/dist/array.full.min.js';
+  const proxied = location.protocol === 'https:';   // on the live site, go through babykeys.link/ingest (see vercel.json)
+  s.src = proxied ? '/ingest/static/array.full.min.js' : 'https://cdn.jsdelivr.net/npm/posthog-js@1/dist/array.full.min.js';
   s.async = true;
   s.onload = () => window.posthog.init(POSTHOG_KEY, {
-    api_host: POSTHOG_HOST,
+    api_host: proxied ? '/ingest' : POSTHOG_HOST,
+    ui_host: 'https://eu.posthog.com',
     cookieless_mode: 'always',
     person_profiles: 'never',
     autocapture: false,
@@ -534,13 +620,13 @@ const RANKS = [
   [0, 'Little Sprout'], [50, 'Busy Bee'], [120, 'Bubble Popper'],
   [250, 'Letter Hunter'], [450, 'Key Captain'], [750, 'Keyboard Wizard'], [1200, 'Alphabet Legend'],
 ];
-// Seconds for the speed bonus to drain. It shortens only a little as you go (the tiles are growing too):
-// 5 → 4.75 → 4.5 → 4.25 → 4. Running out never ends the game; it just lowers the points for that bubble.
+// Seconds to answer each bubble; running out is game over. It shortens only a little as you go
+// (the tiles are growing too): 5 → 4.75 → 4.5 → 4.25 → 4.
 function timeLimit() { return game.popped >= 30 ? 4 : game.popped >= 20 ? 4.25 : game.popped >= 10 ? 4.5 : game.popped >= 5 ? 4.75 : 5; }
 
 // Challenge scoring: points = 10 × difficulty × speed × streak
 //  - difficulty: log2(options), i.e. how unlikely a lucky guess is (3 tiles 1.6, 8 tiles 3, full keyboard 4.7)
-//  - speed: 1.0 when instant, draining smoothly to a 0.3 floor over 5s, so slow-but-right always scores
+//  - speed: 1.0 when instant, draining to 0.3 as the clock runs out, so slow-but-right still scores
 //  - streak: ×1.1 per correct answer in a row, up to ×2 (one wrong answer ends the game)
 //  - pace: sqrt(5 / seconds allowed), a small bonus for the quicker levels (×1.12 at 4s)
 function optionCount() { return TOUCH_ONLY ? Math.max(2, game.choices.length) : (game.popped >= 12 ? 36 : 26); }
@@ -700,7 +786,7 @@ function rankFor(score) {
   return r;
 }
 
-function gameOver() {
+function gameOver(reason = 'wrong') {
   game.over = true; game.overAt = performance.now(); stats.games++;
   if (game.target) { game.target.dying = true; game.target.wobble = 1; }
   // "wah wah wah waaah"
@@ -718,7 +804,8 @@ function gameOver() {
   const pos = board.indexOf(entry) + 1;
   const isNewBest = s > 0 && s > prevBest;
   const isTop = s > 0 && s > prevTop && board.length > 1;
-  track('challenge_game_over', { score: s, letters_popped: game.popped, best_streak: game.bestStreak || 0, new_personal_best: isNewBest, top_of_board: isTop, board_position: pos });
+  document.querySelector('.go-title').textContent = reason === 'time' ? "Time's up!" : 'Game over!';
+  track('challenge_game_over', { reason, score: s, letters_popped: game.popped, best_streak: game.bestStreak || 0, new_personal_best: isNewBest, top_of_board: isTop, board_position: pos });
 
   document.getElementById('go-score').textContent = s;
   document.getElementById('go-label').textContent = `${s === 1 ? 'point' : 'points'} · ${game.popped} popped · best streak ${game.bestStreak || 0}`;
@@ -807,7 +894,13 @@ function syncModeButtons() {
   document.querySelectorAll('.mode').forEach(b => {
     b.setAttribute('aria-pressed', b.dataset.mode === mode);
   });
-  if (TOUCH_ONLY) document.getElementById('settings-note').textContent = 'On phones and tablets, letter levels use big tap-the-matching-letter tiles.';
+  if (TOUCH_ONLY) {
+    document.getElementById('settings-note').textContent = 'On phones and tablets, letter levels use big tap-the-matching-letter tiles.';
+    const find = document.querySelector('.mode[data-mode="find"] small');
+    if (find) find.textContent = 'Tap the big tile that matches the letter in the bubble.';
+    const free = document.querySelector('.mode[data-mode="free"] small');
+    if (free) free.textContent = 'Every tap makes a shape, a colour and a sound. Pop the floating ones!';
+  }
 }
 function openSettings() {
   syncModeButtons();
@@ -830,7 +923,7 @@ function setMode(m) {
   syncModeButtons();
   setTitle();
   pops.length = 0;
-  game.target = null;
+  game.target = null; game.choices = [];
   clearTimeout(nextTargetTimer);
   document.getElementById('gameover').classList.remove('open');
   game.running = false; game.over = false;
@@ -842,6 +935,26 @@ document.querySelectorAll('.mode').forEach(b => b.addEventListener('click', () =
 document.getElementById('play').addEventListener('click', closeSettings);
 settingsEl.addEventListener('pointerdown', e => { if (e.target === settingsEl) closeSettings(); });
 syncModeButtons();
+openSettings();                            // choose a level before anything starts
+
+// ---------- Add to home screen (web app) ----------
+let installPrompt = null;
+const installBtn = document.getElementById('install');
+if (!STANDALONE && (IS_IOS || TOUCH_ONLY)) installBtn.hidden = !IS_IOS;   // iPhone/iPad: no install API, so show how-to
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; if (!STANDALONE) installBtn.hidden = false; });
+addEventListener('appinstalled', () => { installBtn.hidden = true; track('app_installed'); });
+installBtn.addEventListener('click', async () => {
+  if (installPrompt) { installPrompt.prompt(); await installPrompt.userChoice.catch(() => {}); installPrompt = null; installBtn.hidden = true; return; }
+  let help = document.querySelector('.install-help');
+  if (!help) {
+    help = document.createElement('p');
+    help.className = 'install-help';
+    help.innerHTML = 'In Safari, tap the <b>Share</b> button <span aria-hidden="true">(the square with an arrow)</span>, then <b>Add to Home Screen</b>. Baby Keys will open full screen, like an app.';
+    settingsEl.querySelector('.foot').after(help);
+  }
+  track('install_help_shown');
+});
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
 
 // Show the cursor (and the settings button) only while the mouse is moving
 let pointerTimer = 0;
@@ -859,7 +972,7 @@ function start() {
   if (started) return;
   started = true;
   stats.startedAt = performance.now();
-  track('play_started', { mode, touch_device: TOUCH_ONLY });
+  track('play_started', { mode, touch_device: TOUCH_ONLY, home_screen_app: STANDALONE });
   document.body.classList.add('playing');
   document.getElementById('intro').classList.add('gone');
   const el = document.documentElement;
@@ -952,6 +1065,9 @@ addEventListener('pointerdown', e => {
     addPart({ kind: 'twinkle', x: e.clientX, y: e.clientY, vx: 0, vy: -30, hue: 0, size: 12, t: 0, life: 0.7, drag: 0.2, g: 0 });
     return;
   }
+  // tapped a floating shape? pop it
+  const hit = pops.find(o => o.quiet && !o.popped && Math.hypot(o.x - e.clientX, o.y - e.clientY) < o.r * 1.25);
+  if (hit) { popFloater(hit); return; }
   const col = Math.min(9, Math.floor((e.clientX / W) * 10));
   const row = Math.min(3, Math.floor((e.clientY / H) * 4));
   instruments[ROW_SOUND[row].inst](note(ROW_SOUND[row].base, col));
@@ -981,6 +1097,7 @@ addEventListener('contextmenu', e => {
 const SKY = '#6c9dd2', SKY_DEEP = '#4f80b8', CREAM = '#f7e8c4', YELLOW = '#f6c94f';
 const SERIF = '"Fraunces Variable", Fraunces, Georgia, serif';
 const creamA = a => `rgba(247,232,196,${a})`;
+const PASTELS = ['#f4a9bd', '#9fd9bb', '#f8bb8f', '#c7b3e6', '#a9d8f2', YELLOW];   // pink, mint, peach, lilac, sky, butter
 
 const spring = t => t <= 0 ? 0 : 1 - Math.exp(-7 * t) * Math.cos(15 * t);
 const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
@@ -1097,7 +1214,8 @@ function drawPop(o) {
   const t = o.t, r = o.r;
   if (!o.look) {                            // mostly open cream outlines, some solid cream, the odd yellow one
     const roll = hash(o.seed * 3.1);
-    o.look = roll < 0.55 ? 'line' : roll < 0.83 ? 'cream' : 'yellow';
+    o.look = roll < 0.3 ? 'line' : roll < 0.45 ? 'cream' : 'color';
+    o.color = PASTELS[Math.floor(hash(o.seed * 5.3) * PASTELS.length)];
     o.shape = SHAPE_LIST[Math.floor(hash(o.seed * 7.7) * SHAPE_LIST.length)];
   }
   const s = spring(t);
@@ -1115,7 +1233,7 @@ function drawPop(o) {
   const x = o.x + Math.sin(t * 1.7 + o.seed) * 6, y = o.y + Math.sin(t * 2.3 + o.seed) * 5;
   const rot = o.rot + Math.sin(t * 2 + o.seed) * 0.08;
   const lw = Math.max(2.5, r * 0.05);
-  const fill = o.look === 'cream' ? CREAM : o.look === 'yellow' ? YELLOW : null;
+  const fill = o.look === 'cream' ? CREAM : o.look === 'color' ? o.color : null;
   doodle(o.shape, x, y, r, { sx, sy, rot, seed: o.seed, fill, lw, alpha });
   ctx.globalAlpha = alpha;
   // a little highlight stroke
@@ -1219,6 +1337,7 @@ function drawTarget(g, dt) {
   // countdown ring + points badge (Challenge)
   if (mode === 'challenge' && !g.dying) {
     const el = Math.max(0, g.t - 0.3), frac = Math.max(0, 1 - el / g.limit), pts = pointsFor(g);
+    if (el >= g.limit && game.running && !game.over) { gameOver('time'); return; }
     const sec = Math.min(Math.ceil(g.limit), Math.floor(el));
     if (sec > g.lastSec) { g.lastSec = sec; tone(el < g.limit ? 1400 : 600, { dur: 0.06, vol: 0.05 }); g.tick = 1; }
     g.tick = (g.tick || 0) * Math.pow(0.01, dt);
@@ -1332,7 +1451,11 @@ function drawFloaters(dt) {
 
 // ---------- Frame loop ----------
 let last = performance.now(), clock = 0;
-function partColor(q) { return q.color || (q.color = hash(q.size * 91.7 + q.life) < 0.25 ? YELLOW : CREAM); }
+function partColor(q) {
+  if (q.color) return q.color;
+  const h = hash(q.size * 91.7 + q.life);
+  return (q.color = mode === 'free' ? (h < 0.4 ? CREAM : PASTELS[Math.floor(h * 97) % PASTELS.length]) : (h < 0.25 ? YELLOW : CREAM));
+}
 
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now; clock += dt;
@@ -1340,17 +1463,17 @@ function frame(now) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.globalCompositeOperation = 'source-over';
 
-  const idle = (mode === 'free' || !started) && now - lastPress > 7000;
+  const idle = (mode === 'free' || !started) && now - lastPress > 5000;
   drawBackground(dt, idle);
 
-  // Idle attract mode: friendly faces drift in to say hi
+  // Idle attract mode: a few friendly shapes float up from the bottom; tap one and it pops
   if (idle) {
     idleTimer -= dt;
-    if (idleTimer <= 0) {
-      idleTimer = started ? 2.4 : 1.6;
-      burst(rand(0.12, 0.88) * W, rand(0.15, 0.7) * H, 0, { face: true, size: 0.7, quiet: true });
+    if (idleTimer <= 0 && pops.filter(o => o.quiet).length < 6) {
+      idleTimer = rand(1.4, 2.6);
+      burst(rand(0.12, 0.88) * W, H * rand(0.75, 0.95), 0, { face: true, size: rand(0.65, 0.9), quiet: true });
     }
-  } else idleTimer = 0.8;
+  } else idleTimer = 0.6;
 
   // Camera shake (foreground only)
   shake *= Math.pow(0.004, dt);
@@ -1439,13 +1562,14 @@ function frame(now) {
   // Shapes on top
   for (let i = pops.length - 1; i >= 0; i--) {
     const o = pops[i]; o.t += dt;
-    o.y -= 14 * dt;
+    o.y -= (o.quiet ? 38 : 14) * dt;       // idle shapes float up gently
     if (o.t >= o.life) { pops.splice(i, 1); continue; }
   }
   for (const o of pops) drawPop(o);
-  if (game.target) drawTarget(game.target, dt);
+  const menuOpen = settingsOpen() || playerOpen();
+  if (game.target) drawTarget(game.target, menuOpen ? 0 : dt);
   if (started && showKeyboard() && (game.running || game.over)) drawMiniKeyboard(dt, now);
-  if (started && TOUCH_ONLY && game.choices.length) drawChoices(dt);
+  if (started && TOUCH_ONLY && mode !== 'free' && game.choices.length) drawChoices(dt);
   drawFloaters(dt);
 
   requestAnimationFrame(frame);
