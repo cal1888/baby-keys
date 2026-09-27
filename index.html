@@ -3,24 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Rainbow Keys</title>
-<meta name="description" content="A keyboard-bashing game for babies and toddlers. Every key makes a colour, a shape and a sound.">
+<title>Baby Keys</title>
+<meta name="description" content="A keyboard game for babies and toddlers. Every key makes a colour, a shape and a sound, with letter-finding levels for when they're ready.">
 <meta name="theme-color" content="#120d26">
-<meta property="og:title" content="Rainbow Keys">
-<meta property="og:description" content="A keyboard-bashing game for babies and toddlers. Every key makes a colour, a shape and a sound.">
-<meta property="og:image" content="/og.jpg">
+<meta property="og:title" content="Baby Keys">
+<meta property="og:description" content="A keyboard game for babies and toddlers. Every key makes a colour, a shape and a sound.">
+<meta property="og:image" content="https://babykeys.link/og.jpg">
+<meta property="og:url" content="https://babykeys.link">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23ff6b8b'/><stop offset='.5' stop-color='%23ffd23f'/><stop offset='1' stop-color='%234fc3ff'/></linearGradient></defs><rect x='6' y='6' width='88' height='88' rx='26' fill='url(%23g)'/><text x='50' y='70' font-size='56' font-family='Arial Rounded MT Bold,Arial' font-weight='900' text-anchor='middle' fill='white'>A</text></svg>">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #120d26; user-select: none; -webkit-user-select: none; touch-action: none; }
+  :root { --ink: #fff; --muted: rgba(255,255,255,.62); --glass: rgba(24,16,52,.78); --line: rgba(255,255,255,.14);
+          --font: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #120d26; color: var(--ink); font-family: var(--font); user-select: none; -webkit-user-select: none; touch-action: none; }
   body.playing { cursor: none; }
+  body.playing.pointer, body.menu { cursor: auto; }
   canvas { display: block; width: 100vw; height: 100vh; }
+  button { font: inherit; color: inherit; }
+
   #intro {
     position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    color: #fff; text-align: center; pointer-events: none;
+    text-align: center; pointer-events: none;
     transition: opacity .7s ease, transform .7s cubic-bezier(.3,1.6,.5,1);
-    font: 900 clamp(40px, 9vw, 120px)/1 ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif;
+    font: 900 clamp(40px, 9vw, 120px)/1 var(--font);
   }
   #title span {
     display: inline-block; white-space: pre;
@@ -34,29 +42,183 @@
     20% { transform: translateY(-.28em) scale(.92, 1.1); }
     40% { transform: translateY(0) scale(1.12, .88); }
   }
+
+  /* Settings button: quiet during play, wakes up when the mouse moves */
+  #gear {
+    position: fixed; top: 16px; right: 16px; z-index: 5; width: 48px; height: 48px; border-radius: 50%;
+    display: grid; place-items: center; border: 1px solid var(--line); background: rgba(255,255,255,.08);
+    cursor: pointer; opacity: .9; transition: opacity .4s, transform .2s, background .2s;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  #gear svg { width: 24px; height: 24px; transition: transform .6s cubic-bezier(.3,1.5,.5,1); }
+  #gear:hover { background: rgba(255,255,255,.16); }
+  #gear:hover svg { transform: rotate(90deg); }
+  body.playing:not(.pointer) #gear { opacity: .18; }
+  #gear:focus-visible, .mode:focus-visible, #play:focus-visible { outline: 3px solid #ffd23f; outline-offset: 3px; }
+
+  .overlay {
+    position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px;
+    background: rgba(10,6,24,.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+  }
+  .overlay.open { opacity: 1; pointer-events: auto; }
+  .card {
+    width: min(760px, 100%); max-height: calc(100vh - 32px); overflow: auto; box-sizing: border-box;
+    background: var(--glass); border: 1px solid var(--line); border-radius: 32px; padding: 32px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.12);
+    transform: translateY(16px) scale(.96); transition: transform .45s cubic-bezier(.3,1.5,.5,1);
+  }
+  .overlay.open .card { transform: none; }
+  .card h2 { margin: 0; font-size: 34px; font-weight: 900; letter-spacing: -.01em; }
+  .card .sub { margin: 6px 0 22px; color: var(--muted); font-size: 17px; font-weight: 600; }
+  .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .mode {
+    position: relative; text-align: left; cursor: pointer; padding: 18px 18px 20px; border-radius: 22px;
+    border: 2px solid var(--line); background: rgba(255,255,255,.05); display: flex; flex-direction: column; gap: 8px;
+    transition: transform .2s cubic-bezier(.3,1.6,.5,1), border-color .2s, background .2s;
+  }
+  .mode:hover:not(:disabled) { transform: translateY(-3px); background: rgba(255,255,255,.09); }
+  .mode[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); }
+  .mode:disabled { opacity: .4; cursor: not-allowed; }
+  .mode .icon { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; font-size: 26px; font-weight: 900;
+    background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--c) 40%, white), var(--c) 55%, color-mix(in srgb, var(--c) 70%, black));
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--c) 45%, transparent); }
+  .mode b { font-size: 20px; font-weight: 900; }
+  .mode small { color: var(--muted); font-size: 14.5px; line-height: 1.35; font-weight: 600; }
+  .mode .age { position: absolute; top: 16px; right: 16px; font-size: 13px; font-weight: 800; padding: 4px 9px; border-radius: 99px; background: rgba(255,255,255,.1); color: var(--muted); }
+  .mode .check { position: absolute; top: 14px; right: 14px; width: 26px; height: 26px; border-radius: 50%; background: var(--c); display: none; place-items: center; }
+  .mode[aria-pressed="true"] .check { display: grid; }
+  .mode[aria-pressed="true"] .age { display: none; }
+  .foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 22px; flex-wrap: wrap; }
+  .foot p { margin: 0; color: var(--muted); font-size: 14px; font-weight: 600; }
+  #play {
+    cursor: pointer; border: 0; border-radius: 99px; padding: 14px 30px; font-size: 18px; font-weight: 900; color: #1b1030;
+    background: linear-gradient(90deg, #ff8fa3, #ffd23f, #7dffb0, #6fd3ff); box-shadow: 0 8px 24px rgba(255,210,63,.3);
+    transition: transform .2s cubic-bezier(.3,1.6,.5,1);
+  }
+  #play:hover { transform: scale(1.05); }
+
+  #hud {
+    position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 4; display: flex; gap: 10px;
+    opacity: 0; transition: opacity .4s; pointer-events: none;
+  }
+  #hud.show { opacity: 1; }
+  #hud span { padding: 10px 18px; border-radius: 99px; background: rgba(255,255,255,.08); border: 1px solid var(--line);
+    font-size: 18px; font-weight: 800; color: var(--muted); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  #hud b { color: #fff; font-size: 24px; margin-left: 6px; display: inline-block; }
+  #hud b.bump { animation: bump .45s cubic-bezier(.3,1.8,.5,1); }
+  @keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.5); color: #ffd23f; } 100% { transform: scale(1); } }
+
+  #gameover .card { width: min(460px, 100%); text-align: center; }
+  .go-title { font-size: 44px; font-weight: 900; }
+  .go-score { font-size: 120px; font-weight: 900; line-height: 1; margin: 10px 0 2px;
+    background: linear-gradient(180deg, #fff, #ffd9f0); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 6px 24px rgba(255,150,220,.35)); }
+  .go-label { color: var(--muted); font-weight: 700; font-size: 16px; }
+  .badge { display: inline-block; margin: 16px 0 6px; padding: 8px 16px; border-radius: 99px; font-weight: 900; font-size: 17px; background: rgba(255,255,255,.1); }
+  .badge.new { color: #1b1030; background: linear-gradient(90deg, #ffd23f, #ff8fa3); animation: wiggle 1s ease-in-out infinite; }
+  @keyframes wiggle { 0%,100% { transform: rotate(-3deg) scale(1); } 50% { transform: rotate(3deg) scale(1.06); } }
+  .rank { font-size: 24px; font-weight: 900; margin-top: 8px; }
+  .rank small { display: block; font-size: 14px; color: var(--muted); font-weight: 700; margin-bottom: 2px; }
+  .board { list-style: none; padding: 0; margin: 20px auto 0; max-width: 280px; text-align: left; counter-reset: r; }
+  .board li { counter-increment: r; display: flex; justify-content: space-between; padding: 8px 14px; border-radius: 12px; font-weight: 800; color: var(--muted); }
+  .board li::before { content: counter(r) "."; width: 28px; }
+  .board li span { flex: 1; }
+  .board li.me { background: rgba(255,210,63,.16); color: #fff; }
+  .again { margin-top: 22px; font-weight: 800; color: var(--muted); opacity: 0; transition: opacity .4s; }
+  .again.show { opacity: 1; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+
+  @media (max-width: 680px) {
+    .modes { grid-template-columns: 1fr; }
+    .card { padding: 22px; border-radius: 26px; }
+    .go-score { font-size: 96px; }
+  }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="intro">
   <div id="title"></div>
-  <small>Goes full screen · Esc to exit</small>
+  <small id="intro-sub">Goes full screen · Esc to exit</small>
+</div>
+
+<button id="gear" aria-label="Choose a level">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+</button>
+
+<div id="settings" class="overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="card">
+    <h2 id="settings-title">Baby Keys</h2>
+    <p class="sub">Pick a level. You can change it any time from the button in the corner.</p>
+    <div class="modes">
+      <button class="mode" data-mode="free" style="--c:#ff7a9c">
+        <span class="icon">✦</span><span class="age">1+</span><span class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>
+        <b>Free play</b>
+        <small>Every key makes a shape, a colour and a sound. Just bash away.</small>
+      </button>
+      <button class="mode" data-mode="find" style="--c:#35c9ff">
+        <span class="icon">A</span><span class="age">2+</span><span class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>
+        <b>Find the letter</b>
+        <small>Press the letter in the bubble to pop it. A little keyboard shows where it is.</small>
+      </button>
+      <button class="mode" data-mode="challenge" style="--c:#ffb321">
+        <span class="icon">★</span><span class="age">4+</span><span class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>
+        <b>Challenge</b>
+        <small>Pop as many as you can. One wrong key and it's game over. Beat your high score!</small>
+      </button>
+    </div>
+    <div class="foot">
+      <p id="settings-note">Tip: press Esc to leave full screen.</p>
+      <button id="play">Let's play!</button>
+    </div>
+  </div>
+</div>
+
+<div id="hud"><span>Score<b id="score">0</b></span><span>Best<b id="best">0</b></span></div>
+
+<div id="gameover" class="overlay" aria-live="polite">
+  <div class="card">
+    <div class="go-title">Game over!</div>
+    <div class="go-score" id="go-score">0</div>
+    <div class="go-label" id="go-label">letters popped</div>
+    <div class="badge" id="go-badge"></div>
+    <div class="rank" id="go-rank"></div>
+    <ol class="board" id="go-board"></ol>
+    <div class="again" id="go-again">Press any key to play again</div>
+  </div>
 </div>
 <script>
 const TAU = Math.PI * 2;
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[Math.floor(Math.random() * a.length)];
+const TOUCH_ONLY = matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+// ---------- Level (mode) ----------
+const MODES = ['free', 'find', 'challenge'];
+const store = (area, k, v) => { try { if (v === undefined) return window[area].getItem(k); window[area].setItem(k, v); } catch { return null; } };
+let mode = new URLSearchParams(location.search).get('mode') || store('localStorage', 'babykeys-mode') || 'free';
+if (!MODES.includes(mode) || (TOUCH_ONLY && mode !== 'free')) mode = 'free';
 
 // Rainbow bouncing title
-const TOUCH_ONLY = matchMedia('(hover: none) and (pointer: coarse)').matches;
-if (TOUCH_ONLY) document.querySelector('#intro small').textContent = 'Tap, tap, tap!';
-[...(TOUCH_ONLY ? 'Tap anywhere!' : 'Press any key!')].forEach((ch, i) => {
-  const s = document.createElement('span');
-  s.textContent = ch;
-  s.style.color = `hsl(${(i * 28) % 360}, 95%, 70%)`;
-  s.style.animationDelay = `${i * 0.07}s`;
-  document.getElementById('title').appendChild(s);
-});
+const INTRO = {
+  free: TOUCH_ONLY ? 'Tap anywhere!' : 'Press any key!',
+  find: 'Find the letter!',
+  challenge: 'Ready? Press a key!',
+};
+function setTitle() {
+  const t = document.getElementById('title');
+  t.innerHTML = '';
+  [...INTRO[mode]].forEach((ch, i) => {
+    const s = document.createElement('span');
+    s.textContent = ch;
+    s.style.color = `hsl(${(i * 28) % 360}, 95%, 70%)`;
+    s.style.animationDelay = `${i * 0.07}s`;
+    t.appendChild(s);
+  });
+  document.getElementById('intro-sub').textContent = TOUCH_ONLY ? 'Tap, tap, tap!' : 'Goes full screen · Esc to exit';
+}
+setTitle();
 
 // ---------- Canvas ----------
 const cv = document.getElementById('c');
@@ -247,9 +409,9 @@ function explode(r) {
 }
 
 // ---------- Analytics (cookieless PostHog: no cookies, no personal data, never which keys) ----------
-const POSTHOG_KEY = 'phc_sPQFeZHeXN8JNVR3MsgxAyoZaUfmntff6YQdpG3ZTPs7';                        // project API key (phc_...); empty = analytics off
+const POSTHOG_KEY = 'phc_sPQFeZHeXN8JNVR3MsgxAyoZaUfmntff6YQdpG3ZTPs7';
 const POSTHOG_HOST = 'https://eu.i.posthog.com';
-const stats = { presses: 0, taps: 0, specials: 0, startedAt: 0, sent: false };
+const stats = { presses: 0, taps: 0, specials: 0, hits: 0, misses: 0, games: 0, startedAt: 0, sent: false };
 if (POSTHOG_KEY) {
   const s = document.createElement('script');
   s.src = 'https://cdn.jsdelivr.net/npm/posthog-js@1/dist/array.full.min.js';
@@ -271,13 +433,207 @@ function endSession() {
   track('play_session_ended', {
     duration_s: Math.round((performance.now() - stats.startedAt) / 1000),
     key_presses: stats.presses, taps: stats.taps, special_keys: stats.specials,
-    touch_device: TOUCH_ONLY,
+    letters_found: stats.hits, wrong_keys: stats.misses, challenge_games: stats.games,
+    high_score: game.best, mode, touch_device: TOUCH_ONLY,
   }, { transport: 'sendBeacon' });
 }
 addEventListener('pagehide', endSession);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') endSession();
-  else if (stats.sent) { stats.sent = false; stats.startedAt = performance.now(); stats.presses = stats.taps = stats.specials = 0; }
+  else if (stats.sent) {
+    Object.assign(stats, { presses: 0, taps: 0, specials: 0, hits: 0, misses: 0, games: 0, sent: false, startedAt: performance.now() });
+  }
+});
+
+// ---------- Letter game (Find the letter + Challenge) ----------
+const LETTERS = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
+const DIGITS = [...'1234567890'];
+const CHEERS = ['Yay!', 'Pop!', 'Wow!', 'Yes!', 'Great!', 'Hooray!', 'Super!'];
+const RANKS = [
+  [0, 'Little Sprout'], [3, 'Busy Bee'], [6, 'Bubble Popper'],
+  [10, 'Letter Hunter'], [15, 'Key Captain'], [25, 'Keyboard Wizard'], [40, 'Alphabet Legend'],
+];
+const game = {
+  target: null, score: 0, over: false, overAt: 0, streak: 0,
+  best: +(store('sessionStorage', 'babykeys-best') || 0),
+  scores: JSON.parse(store('sessionStorage', 'babykeys-scores') || '[]'),
+};
+const floaters = [];
+let miniFlash = null, nextTargetTimer = 0;
+
+function codeFor(ch) { return /\d/.test(ch) ? 'Digit' + ch : 'Key' + ch; }
+
+function newTarget() {
+  const pool = mode === 'challenge' && game.score >= 12 ? LETTERS.concat(DIGITS) : LETTERS;
+  let ch;
+  do ch = pick(pool); while (game.target && ch === game.target.label);
+  const info = keyInfo(codeFor(ch));
+  const yRange = mode === 'find' ? [0.2, 0.46] : [0.28, 0.68];
+  game.target = {
+    label: ch, info, hue: info.hue,
+    x: rand(0.25, 0.75) * W, y: rand(...yRange) * H,
+    r: Math.min(W, H) * (mode === 'find' ? 0.15 : 0.13),
+    t: 0, wobble: 0, dying: false, dieT: 0,
+  };
+}
+
+function beginGame() {
+  game.score = 0; game.over = false; game.streak = 0; game.target = null;
+  updateHud();
+  document.getElementById('gameover').classList.remove('open');
+  document.getElementById('go-again').classList.remove('show');
+  clearTimeout(nextTargetTimer);
+  nextTargetTimer = setTimeout(newTarget, 250);
+}
+
+function updateHud(bump) {
+  document.getElementById('hud').classList.toggle('show', mode === 'challenge' && started);
+  const sc = document.getElementById('score'), be = document.getElementById('best');
+  sc.textContent = game.score; be.textContent = game.best;
+  if (bump) { sc.classList.remove('bump'); void sc.offsetWidth; sc.classList.add('bump'); }
+}
+
+function floater(text, x, y, hue, size = 1) {
+  floaters.push({ text, x, y, hue, t: 0, life: 1.1, size });
+}
+
+function hitTarget(k) {
+  const g = game.target;
+  game.target = null;
+  stats.hits++;
+  game.streak++;
+  instruments[k.inst](note(k.base, k.i));
+  tone(note(C5, 2 + (game.streak % 5)), { t: 0.08, dur: 0.5, vol: 0.12 });
+  tone(note(C5, 5 + (game.streak % 5)), { t: 0.16, dur: 0.6, vol: 0.1 });
+  // Bubble pop: rings, sparks, a flash and a wobbly shape with the letter
+  rings.push({ x: g.x, y: g.y, hue: g.hue, t: 0, life: 0.7, maxR: g.r * 3.2, w: 16 });
+  sparks(g.x, g.y, g.hue, { dots: 30, confetti: 18, twinkles: 10, speed: 1.3 });
+  flashes.push({ x: g.x, y: g.y, hue: g.hue, t: 0, life: 0.7 });
+  tintBackground(g.hue);
+  shake = Math.max(shake, 7);
+  if (mode === 'challenge') {
+    game.score++;
+    const isBest = game.score > game.best;
+    if (isBest) { game.best = game.score; store('sessionStorage', 'babykeys-best', game.best); }
+    updateHud(true);
+    floater('+1', g.x, g.y - g.r * 0.4, g.hue, 1.2);
+    if (game.score % 10 === 0) { rainbowBlast(); floater(`${game.score}!`, W / 2, H * 0.4, 50, 2); }
+  } else {
+    floater(pick(CHEERS), g.x, g.y - g.r * 0.4, g.hue);
+    if (stats.hits % 5 === 0) rainbowBlast();
+  }
+  nextTargetTimer = setTimeout(newTarget, mode === 'challenge' ? 300 : 650);
+}
+
+function missTarget(k) {
+  stats.misses++;
+  miniFlash = { label: k.label, t: 0 };
+  if (mode === 'find') {
+    game.target.wobble = 1;
+    game.streak = 0;
+    tone(196, { type: 'triangle', slideTo: 150, slideTime: 0.2, dur: 0.28, vol: 0.14 });
+    // a tiny faded sparkle where the wrong key sits, so it still feels responsive
+    addPart({ kind: 'twinkle', x: k.x * W, y: k.y * H, vx: 0, vy: -30, hue: k.hue, size: 10, t: 0, life: 0.6, drag: 0.2, g: 0 });
+  } else {
+    gameOver();
+  }
+}
+
+function rankFor(score) {
+  let r = RANKS[0][1];
+  for (const [min, name] of RANKS) if (score >= min) r = name;
+  return r;
+}
+
+function gameOver() {
+  game.over = true; game.overAt = performance.now(); stats.games++;
+  if (game.target) { game.target.dying = true; game.target.wobble = 1; }
+  // "wah wah wah waaah"
+  [392, 370, 349].forEach((f, i) => tone(f, { type: 'triangle', t: i * 0.28, dur: 0.32, vol: 0.16 }));
+  tone(330, { type: 'triangle', t: 0.84, dur: 1.1, vol: 0.16, slideTo: 300, slideTime: 1 });
+  shake = 12;
+
+  const s = game.score;
+  const prevBest = Math.max(0, ...game.scores);
+  const isNewBest = s > 0 && s > prevBest;
+  game.scores.push(s);
+  game.scores.sort((a, b) => b - a);
+  store('sessionStorage', 'babykeys-scores', JSON.stringify(game.scores.slice(0, 20)));
+  track('challenge_game_over', { score: s, new_high_score: isNewBest, games_this_session: game.scores.length });
+
+  document.getElementById('go-score').textContent = s;
+  document.getElementById('go-label').textContent = s === 1 ? 'letter popped' : 'letters popped';
+  const badge = document.getElementById('go-badge');
+  badge.className = 'badge' + (isNewBest ? ' new' : '');
+  badge.textContent = isNewBest ? '★ New high score! ★' : `High score: ${game.best}`;
+  document.getElementById('go-rank').innerHTML = `<small>You are a</small>${rankFor(s)}`;
+  const board = document.getElementById('go-board');
+  board.innerHTML = '';
+  let marked = false;
+  game.scores.slice(0, 5).forEach(v => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span>${v === s && !marked ? 'This game' : 'Earlier'}</span>${v}`;
+    if (v === s && !marked) { li.className = 'me'; marked = true; }
+    board.appendChild(li);
+  });
+  setTimeout(() => {
+    document.getElementById('gameover').classList.add('open');
+    if (isNewBest) { rainbowBlast(); }
+  }, 700);
+  setTimeout(() => document.getElementById('go-again').classList.add('show'), 1800);
+}
+
+// ---------- Settings ----------
+const settingsEl = document.getElementById('settings');
+const settingsOpen = () => settingsEl.classList.contains('open');
+function syncModeButtons() {
+  document.querySelectorAll('.mode').forEach(b => {
+    b.setAttribute('aria-pressed', b.dataset.mode === mode);
+    if (TOUCH_ONLY && b.dataset.mode !== 'free') {
+      b.disabled = true;
+      b.querySelector('small').textContent = 'Needs a keyboard.';
+    }
+  });
+  if (TOUCH_ONLY) document.getElementById('settings-note').textContent = 'Letter levels need a keyboard.';
+}
+function openSettings() {
+  syncModeButtons();
+  settingsEl.classList.add('open');
+  document.body.classList.add('menu');
+  document.querySelector(`.mode[data-mode="${mode}"]`)?.focus();
+}
+function closeSettings() {
+  settingsEl.classList.remove('open');
+  document.body.classList.remove('menu');
+  document.activeElement?.blur?.();
+}
+function setMode(m) {
+  if (m === mode) return;
+  mode = m;
+  store('localStorage', 'babykeys-mode', mode);
+  track('level_changed', { mode });
+  syncModeButtons();
+  setTitle();
+  pops.length = 0;
+  game.target = null;
+  clearTimeout(nextTargetTimer);
+  document.getElementById('gameover').classList.remove('open');
+  if (started && mode !== 'free') beginGame();
+  updateHud();
+}
+document.getElementById('gear').addEventListener('click', openSettings);
+document.querySelectorAll('.mode').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+document.getElementById('play').addEventListener('click', () => { closeSettings(); start(); });
+settingsEl.addEventListener('pointerdown', e => { if (e.target === settingsEl) closeSettings(); });
+syncModeButtons();
+
+// Show the cursor (and the settings button) only while the mouse is moving
+let pointerTimer = 0;
+addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse') return;
+  document.body.classList.add('pointer');
+  clearTimeout(pointerTimer);
+  pointerTimer = setTimeout(() => document.body.classList.remove('pointer'), 2500);
 });
 
 // ---------- Input ----------
@@ -287,46 +643,77 @@ function start() {
   if (started) return;
   started = true;
   stats.startedAt = performance.now();
-  track('play_started', { touch_device: TOUCH_ONLY });
+  track('play_started', { mode, touch_device: TOUCH_ONLY });
   document.body.classList.add('playing');
   document.getElementById('intro').classList.add('gone');
   const el = document.documentElement;
   (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)?.catch?.(() => {});
+  if (mode !== 'free') beginGame();
+  updateHud();
 }
 
-addEventListener('keydown', e => {
-  e.preventDefault();
-  if (e.code === 'Escape') return;       // let the browser exit full screen
-  start();
-  if (e.repeat) return;                   // holding a key down shouldn't spam
-  lastPress = performance.now();
-  stats.presses++;
-
-  const k = keyInfo(e.code);
-  if (!k) stats.specials++;
+function freePlay(code, k) {
   if (k) {
     instruments[k.inst](note(k.base, k.i));
     burst(k.x * W + rand(-30, 30), k.y * H + rand(-30, 30), k.hue + rand(-10, 10), { label: k.label });
-  } else if (e.code === 'Space') {
+  } else if (code === 'Space') {
     tone(160, { slideTo: 45, slideTime: 0.5, dur: 0.9, vol: 0.5 });
     whoosh();
-    [0, 2, 4, 7].forEach((i, n) => instruments.bell(note(C4, i + 5), n));
+    [0, 2, 4, 7].forEach((i, n) => setTimeout(() => instruments.bell(note(C4, i + 5)), n * 70));
     rainbowBlast();
-  } else if (e.code === 'Enter') {
+  } else if (code === 'Enter') {
     [0.2, 0.4, 0.6, 0.8].forEach((fx, n) => launchRocket(W * fx + rand(-40, 40), n * 80 + rand(0, 40), n * 0.12));
-  } else if (e.code === 'Backspace' || e.code === 'Delete') {
+  } else if (code === 'Backspace' || code === 'Delete') {
     tone(700, { type: 'triangle', slideTo: 180, slideTime: 0.3, dur: 0.4, vol: 0.25 });
     burst(rand(0.15, 0.85) * W, rand(0.2, 0.8) * H, 200, { face: true, size: 1.2 });
   } else {
     instruments.bell(note(C4, Math.floor(rand(0, 10))));
     burst(rand(0.1, 0.9) * W, rand(0.15, 0.85) * H, rand(0, 360), { face: true });
   }
+}
+
+const MODIFIERS = /^(Shift|Control|Alt|Meta|CapsLock|Tab|Fn|OS)/;
+addEventListener('keydown', e => {
+  if (settingsOpen()) {
+    if (e.code === 'Escape') closeSettings();
+    return;                               // let Tab/Enter/Space work normally in the menu
+  }
+  e.preventDefault();
+  if (e.code === 'Escape') return;       // let the browser exit full screen
+  const wasStarted = started;
+  start();
+  if (e.repeat) return;                   // holding a key down shouldn't spam
+  lastPress = performance.now();
+  stats.presses++;
+  const k = keyInfo(e.code);
+  if (!k) stats.specials++;
+
+  if (mode === 'free') return freePlay(e.code, k);
+  if (!wasStarted) return;                // the first key only starts the game
+
+  if (game.over) {
+    if (performance.now() - game.overAt > 1800) beginGame();
+    return;
+  }
+  if (!k) {                               // Space, arrows etc. don't count as wrong
+    if (!MODIFIERS.test(e.code)) addPart({ kind: 'twinkle', x: rand(0.2, 0.8) * W, y: rand(0.2, 0.8) * H, vx: 0, vy: -20, hue: rand(0, 360), size: 9, t: 0, life: 0.6, drag: 0.2, g: 0 });
+    return;
+  }
+  const g = game.target;
+  if (!g || g.dying || g.t < 0.12) return; // ignore presses while the next bubble is arriving
+  if (k.label === g.label) hitTarget(k);
+  else missTarget(k);
 });
 
 addEventListener('pointerdown', e => {
+  if (e.target.closest('#gear, .overlay')) return;
   start();
   lastPress = performance.now();
   stats.taps++;
+  if (mode !== 'free') {
+    addPart({ kind: 'twinkle', x: e.clientX, y: e.clientY, vx: 0, vy: -30, hue: rand(0, 360), size: 12, t: 0, life: 0.7, drag: 0.2, g: 0 });
+    return;
+  }
   const col = Math.min(9, Math.floor((e.clientX / W) * 10));
   const row = Math.min(3, Math.floor((e.clientY / H) * 4));
   instruments[ROW_SOUND[row].inst](note(ROW_SOUND[row].base, col));
@@ -480,6 +867,107 @@ function drawTwinkle(x, y, s) {
   ctx.fill();
 }
 
+// The letter bubble for Find the letter / Challenge
+function drawTarget(g, dt) {
+  g.t += dt;
+  g.wobble *= Math.pow(0.03, dt);
+  let s = spring(g.t);
+  if (g.dying) {
+    g.dieT += dt;
+    s *= Math.max(0, 1 - easeOutCubic(Math.min(1, g.dieT / 0.6)));
+    if (g.dieT > 0.6) { if (game.target === g) game.target = null; return; }
+  }
+  const hint = mode === 'find' && g.t > 4 && !g.dying ? 1 + 0.07 * Math.sin(g.t * 6) : 1;
+  const x = g.x + Math.sin(g.t * 1.3) * 10 + Math.sin(g.t * 45) * g.wobble * 20;
+  const y = g.y + Math.sin(g.t * 1.7) * 9;
+  const r = g.r * Math.max(s, 0) * hint;
+  if (r < 1) return;
+  const hue = g.dying ? 0 : g.hue;
+
+  ctx.globalCompositeOperation = 'lighter';
+  const glow = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 2);
+  glow.addColorStop(0, `hsla(${hue},100%,60%,.35)`);
+  glow.addColorStop(1, `hsla(${hue},100%,60%,0)`);
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, r * 2, 0, TAU); ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+
+  // soap-bubble body: clear middle, coloured rim
+  const body = ctx.createRadialGradient(x - r * 0.2, y - r * 0.25, r * 0.1, x, y, r);
+  body.addColorStop(0, `hsla(${hue},90%,70%,.12)`);
+  body.addColorStop(0.7, `hsla(${hue},90%,62%,.28)`);
+  body.addColorStop(1, `hsla(${hue},100%,72%,.7)`);
+  ctx.fillStyle = body; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+  ctx.lineWidth = Math.max(2, r * 0.035);
+  ctx.strokeStyle = `hsla(${hue},100%,88%,.85)`; ctx.stroke();
+  // rainbow sheen and shine
+  ctx.lineCap = 'round';
+  ctx.lineWidth = r * 0.07;
+  ctx.strokeStyle = `hsla(${(hue + 120) % 360},100%,80%,.45)`;
+  ctx.beginPath(); ctx.arc(x, y, r * 0.84, 0.15 * Math.PI, 0.55 * Math.PI); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,.7)';
+  ctx.beginPath(); ctx.ellipse(x - r * 0.42, y - r * 0.45, r * 0.2, r * 0.1, -0.7, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(x - r * 0.18, y - r * 0.64, r * 0.045, 0, TAU); ctx.fill();
+
+  const fs = r * 1.05;
+  ctx.font = `900 ${fs}px ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = `hsl(${hue},80%,28%)`;
+  ctx.fillText(g.label, x, y + fs * 0.1);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(g.label, x, y + fs * 0.04);
+}
+
+// A little keyboard at the bottom that lights up the key to press (Find the letter only)
+const MINI_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'], MINI_OFFS = [0, 0.3, 0.8];
+function drawMiniKeyboard(dt, now) {
+  if (miniFlash) { miniFlash.t += dt; if (miniFlash.t > 0.6) miniFlash = null; }
+  const ks = Math.min(W * 0.064, H * 0.07, 54), gap = ks * 0.16;
+  const totalW = 10 * ks + 9 * gap, totalH = 3 * ks + 2 * gap;
+  const x0 = (W - totalW) / 2, y0 = H - totalH - Math.max(22, H * 0.045);
+  ctx.fillStyle = 'rgba(255,255,255,.05)';
+  ctx.beginPath(); ctx.roundRect(x0 - gap * 2, y0 - gap * 2, totalW + gap * 4, totalH + gap * 4, ks * 0.45); ctx.fill();
+  const tgt = game.target && !game.target.dying ? game.target : null;
+  const pulse = 0.5 + 0.5 * Math.sin(now / 180);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `800 ${ks * 0.46}px ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif`;
+  MINI_ROWS.forEach((row, r) => [...row].forEach((ch, c) => {
+    const x = x0 + (c + MINI_OFFS[r]) * (ks + gap), y = y0 + r * (ks + gap);
+    const isT = tgt && tgt.label === ch;
+    const isWrong = miniFlash && miniFlash.label === ch;
+    const lift = isT ? -ks * 0.12 * pulse : 0;
+    ctx.save();
+    if (isT) { ctx.shadowColor = `hsl(${tgt.hue},100%,60%)`; ctx.shadowBlur = 24; }
+    ctx.fillStyle = isT ? `hsl(${tgt.hue},95%,${55 + pulse * 10}%)`
+                  : isWrong ? `rgba(255,90,120,${0.8 * (1 - miniFlash.t / 0.6) + 0.1})`
+                  : 'rgba(255,255,255,.11)';
+    ctx.beginPath(); ctx.roundRect(x, y + lift, ks, ks, ks * 0.22); ctx.fill();
+    ctx.restore();
+    // key "edge" for a bit of depth
+    ctx.fillStyle = 'rgba(0,0,0,.18)';
+    ctx.fillRect(x + ks * 0.15, y + lift + ks - 3, ks * 0.7, 2);
+    ctx.fillStyle = isT ? '#fff' : 'rgba(255,255,255,.55)';
+    ctx.fillText(ch, x + ks / 2, y + lift + ks * 0.53);
+  }));
+}
+
+function drawFloaters(dt) {
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    const f = floaters[i]; f.t += dt;
+    const p = f.t / f.life;
+    if (p >= 1) { floaters.splice(i, 1); continue; }
+    const sc = spring(f.t) * f.size;
+    ctx.save();
+    ctx.globalAlpha = p > 0.6 ? 1 - (p - 0.6) / 0.4 : 1;
+    ctx.translate(f.x, f.y - easeOutCubic(p) * 80);
+    ctx.scale(sc, sc);
+    ctx.font = `900 ${Math.min(W, H) * 0.06}px ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = `hsl(${f.hue},80%,30%)`; ctx.fillText(f.text, 0, 4);
+    ctx.fillStyle = '#fff'; ctx.fillText(f.text, 0, 0);
+    ctx.restore();
+  }
+}
+
 // Gentle floating bokeh so the screen is never still
 const ambient = Array.from({ length: 45 }, () => ({ x: Math.random(), y: Math.random(), s: rand(1, 4), v: rand(0.01, 0.035), hue: rand(0, 360), ph: rand(0, TAU) }));
 const RAINBOW = [0, 28, 52, 130, 195, 235, 280];
@@ -514,7 +1002,7 @@ function frame(now) {
   }
 
   // Idle attract mode: friendly faces drift in to say hi
-  const idle = now - lastPress > 7000;
+  const idle = (mode === 'free' || !started) && now - lastPress > 7000;
   if (idle) {
     idleTimer -= dt;
     if (idleTimer <= 0) {
@@ -619,6 +1107,9 @@ function frame(now) {
     if (o.t >= o.life) { pops.splice(i, 1); continue; }
   }
   for (const o of pops) drawPop(o);
+  if (game.target) drawTarget(game.target, dt);
+  if (mode === 'find' && started) drawMiniKeyboard(dt, now);
+  drawFloaters(dt);
 
   requestAnimationFrame(frame);
 }
