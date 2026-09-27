@@ -580,7 +580,7 @@ const stats = { presses: 0, taps: 0, specials: 0, hits: 0, misses: 0, games: 0, 
 if (POSTHOG_KEY) {
   const s = document.createElement('script');
   const proxied = location.protocol === 'https:';   // on the live site, go through babykeys.link/ingest (see vercel.json)
-  s.src = proxied ? '/ingest/static/array.full.min.js' : 'https://cdn.jsdelivr.net/npm/posthog-js@1/dist/array.full.min.js';
+  s.src = proxied ? '/ingest/static/array.full.js' : 'https://cdn.jsdelivr.net/npm/posthog-js@1/dist/array.full.min.js';
   s.async = true;
   s.onload = () => window.posthog.init(POSTHOG_KEY, {
     api_host: proxied ? '/ingest' : POSTHOG_HOST,
