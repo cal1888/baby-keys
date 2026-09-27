@@ -918,7 +918,11 @@ addEventListener('pointermove', e => {
 
 // Ask before closing if someone hits Cmd+W mid-play
 addEventListener('beforeunload', e => { if (started) { e.preventDefault(); e.returnValue = ''; } });
-addEventListener('contextmenu', e => e.preventDefault());
+// Block the right-click menu only during play (so a toddler can't pop it up); Shift + right-click still works
+addEventListener('contextmenu', e => {
+  if (!started || e.shiftKey || e.target.closest('.overlay')) return;
+  e.preventDefault();
+});
 
 // ---------- Drawing: "cozy doodles" style ----------
 // Soft sky-blue field, wobbly hand-drawn cream linework, a few solid cream fills, one buttery-yellow accent.
