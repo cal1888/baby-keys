@@ -534,16 +534,19 @@ const RANKS = [
   [0, 'Little Sprout'], [50, 'Busy Bee'], [120, 'Bubble Popper'],
   [250, 'Letter Hunter'], [450, 'Key Captain'], [750, 'Keyboard Wizard'], [1200, 'Alphabet Legend'],
 ];
-const TIME_LIMIT = 5;                     // seconds for the speed bonus to drain
+// Seconds for the speed bonus to drain. It shortens only a little as you go (the tiles are growing too):
+// 5 → 4.75 → 4.5 → 4.25 → 4. Running out never ends the game; it just lowers the points for that bubble.
+function timeLimit() { return game.popped >= 30 ? 4 : game.popped >= 20 ? 4.25 : game.popped >= 10 ? 4.5 : game.popped >= 5 ? 4.75 : 5; }
 
 // Challenge scoring: points = 10 × difficulty × speed × streak
 //  - difficulty: log2(options), i.e. how unlikely a lucky guess is (3 tiles 1.6, 8 tiles 3, full keyboard 4.7)
 //  - speed: 1.0 when instant, draining smoothly to a 0.3 floor over 5s, so slow-but-right always scores
 //  - streak: ×1.1 per correct answer in a row, up to ×2 (one wrong answer ends the game)
+//  - pace: sqrt(5 / seconds allowed), a small bonus for the quicker levels (×1.12 at 4s)
 function optionCount() { return TOUCH_ONLY ? Math.max(2, game.choices.length) : (game.popped >= 12 ? 36 : 26); }
-function speedFactor(g) { return 0.3 + 0.7 * Math.max(0, 1 - Math.max(0, g.t - 0.3) / TIME_LIMIT); }
+function speedFactor(g) { return 0.3 + 0.7 * Math.max(0, 1 - Math.max(0, g.t - 0.3) / g.limit); }
 function streakFactor() { return 1 + 0.1 * Math.min(game.streak, 10); }
-function pointsFor(g) { return Math.max(1, Math.round(10 * Math.log2(optionCount()) * speedFactor(g) * streakFactor())); }
+function pointsFor(g) { return Math.max(1, Math.round(10 * Math.log2(optionCount()) * speedFactor(g) * streakFactor() * Math.sqrt(5 / g.limit))); }
 // Touch screens: more tiles as you go (and more points per answer)
 function tileCount() { return mode === 'find' ? 3 : game.popped >= 20 ? 8 : game.popped >= 10 ? 6 : game.popped >= 5 ? 4 : 3; }
 const game = { choices: [], target: null, score: 0, popped: 0, over: false, overAt: 0, streak: 0, running: false, best: 0 };
@@ -614,7 +617,7 @@ function newTarget() {
     label: ch, info, hue: info.hue,
     x: rand(0.25, 0.75) * W, y: cy,
     r,
-    t: 0, wobble: 0, dying: false, dieT: 0, lastSec: 0,
+    t: 0, wobble: 0, dying: false, dieT: 0, lastSec: 0, limit: timeLimit(),
   };
 }
 
@@ -668,7 +671,7 @@ function hitTarget(k) {
     updateHud(true);
     floater(`+${pts}${fast ? ' Speedy!' : ''}`, g.x, g.y - g.r * 0.4, g.hue, fast ? 1.1 : 1.2);
     if (game.streak >= 3) floater(`streak ×${streakFactor().toFixed(1)}`, g.x, g.y + g.r * 0.9, g.hue, 0.7);
-    if (TOUCH_ONLY && [5, 10, 20].includes(game.popped)) floater('More tiles!', W / 2, H * 0.3, 50, 1.3);
+    if ([5, 10, 20, 30].includes(game.popped)) floater(TOUCH_ONLY && game.popped < 30 ? 'More tiles · a bit faster!' : 'A bit faster!', W / 2, H * 0.3, 50, 1.1);
     if (game.popped % 10 === 0) { rainbowBlast(); floater(`${game.popped} popped!`, W / 2, H * 0.4, 50, 1.6); }
   } else {
     floater(pick(CHEERS), g.x, g.y - g.r * 0.4, g.hue);
@@ -1215,9 +1218,9 @@ function drawTarget(g, dt) {
 
   // countdown ring + points badge (Challenge)
   if (mode === 'challenge' && !g.dying) {
-    const el = Math.max(0, g.t - 0.3), frac = Math.max(0, 1 - el / TIME_LIMIT), pts = pointsFor(g);
-    const sec = Math.min(TIME_LIMIT, Math.floor(el));
-    if (sec > g.lastSec) { g.lastSec = sec; tone(sec < TIME_LIMIT ? 1400 : 600, { dur: 0.06, vol: 0.05 }); g.tick = 1; }
+    const el = Math.max(0, g.t - 0.3), frac = Math.max(0, 1 - el / g.limit), pts = pointsFor(g);
+    const sec = Math.min(Math.ceil(g.limit), Math.floor(el));
+    if (sec > g.lastSec) { g.lastSec = sec; tone(el < g.limit ? 1400 : 600, { dur: 0.06, vol: 0.05 }); g.tick = 1; }
     g.tick = (g.tick || 0) * Math.pow(0.01, dt);
     const R = r * 1.2;
     ctx.setLineDash([2, 9]); ctx.strokeStyle = creamA(0.5); ctx.lineWidth = 2.5;

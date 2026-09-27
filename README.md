@@ -14,7 +14,7 @@ Pick a level from the settings button in the top-right corner.
 
   Points = 10 × difficulty × speed × streak:
   - **difficulty** is log2 of the number of options, i.e. how unlikely a lucky guess is (3 tiles 1.6, 8 tiles 3, full keyboard 4.7);
-  - **speed** drains smoothly from 1.0 to a 0.3 floor over 5 seconds, so a slow correct answer always scores;
+  - **speed** drains smoothly from 1.0 to a 0.3 floor, so a slow correct answer always scores. The clock is 5s and shortens only slightly as you go (4.75s after 5 pops, 4.5s after 10, 4.25s after 20, 4s from 30), with a small pace bonus of √(5 ÷ seconds);
   - **streak** adds ×0.1 per correct answer in a row, up to ×2.
 
 It goes full screen on the first key press. Holding a key down only plays it once, and the volume is capped.
