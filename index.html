@@ -153,19 +153,15 @@
   .again.show { opacity: 1; animation: pulse 1.4s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .45; } }
 
-  #rotate { display: none; position: fixed; inset: 0; z-index: 20; background: var(--sky); color: var(--cream);
-    flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; }
-  #rotate p { margin: 18px 0 0; font: 500 34px var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; }
-  #rotate small { font-size: 11px; opacity: .85; }
-  #rotate .phone { width: 64px; height: 110px; border: 3px solid var(--cream); border-radius: 16px; display: grid; place-items: center;
-    animation: turn 2.4s cubic-bezier(.6,0,.3,1) infinite; }
-  #rotate .phone span { width: 34px; height: 34px; border-radius: 10px; background: var(--yellow); color: var(--ink); display: grid; place-items: center; font: 600 20px var(--serif); }
-  @keyframes turn { 0%, 20% { transform: rotate(0); } 55%, 85% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
-  @media (orientation: portrait) { body.touch.letters:not(.menu) #rotate { display: flex; } }
-  body.touch.letters #gear { z-index: 21; }
 
   /* Short screens (phones held sideways): compact cards and score bar */
   .card { touch-action: pan-y; }
+  @media (max-width: 560px) {
+    #hud { top: 12px; left: 12px; transform: none; gap: 6px; }
+    #hud span { padding: 4px 10px; font-size: 9px; letter-spacing: .18em; }
+    #hud #hud-name { font-size: 14px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #hud b { font-size: 18px; margin-left: 6px; }
+  }
   @media (max-height: 520px) {
     #hud { top: 8px; gap: 6px; }
     #hud span { padding: 4px 12px; font-size: 10px; }
@@ -233,9 +229,9 @@
         <small>Press the letter in the bubble to pop it. A little keyboard shows where it is.</small>
       </button>
       <button class="mode" data-mode="challenge" style="--c:#ffb321">
-        <span class="icon">5</span><span class="age">4+</span><span class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f6c94f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>
+        <span class="icon">★</span><span class="age">4+</span><span class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f6c94f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>
         <b>Challenge</b>
-        <small>Pop them fast: up to 5 points each. One wrong key and it's game over. High scores are saved with your name.</small>
+        <small>Faster answers and more tiles mean more points, and streaks multiply them. One wrong answer and it's game over.</small>
       </button>
     </div>
     <div class="foot">
@@ -243,12 +239,6 @@
       <button id="play" class="cta">Let's play!</button>
     </div>
   </div>
-</div>
-
-<div id="rotate" aria-live="polite">
-  <div class="phone" aria-hidden="true"><span>A</span></div>
-  <p>Turn me sideways</p>
-  <small class="caps">Letter games play best this way</small>
 </div>
 
 <div id="hud"><span id="hud-name"></span><span>Score<b id="score">0</b></span><span>Best<b id="best">0</b></span></div>
@@ -297,7 +287,6 @@ const INTRO = {
 function syncBodyMode() {
   document.body.classList.toggle('touch', TOUCH_ONLY);
   document.body.classList.toggle('letters', mode !== 'free');
-  if (TOUCH_ONLY && mode !== 'free' && document.fullscreenElement) screen.orientation?.lock?.('landscape').catch(() => {});
 }
 function setTitle() {
   syncBodyMode();
@@ -542,11 +531,22 @@ const LETTERS = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
 const DIGITS = [...'1234567890'];
 const CHEERS = ['Yay!', 'Pop!', 'Wow!', 'Yes!', 'Great!', 'Hooray!', 'Super!'];
 const RANKS = [
-  [0, 'Little Sprout'], [15, 'Busy Bee'], [35, 'Bubble Popper'],
-  [60, 'Letter Hunter'], [100, 'Key Captain'], [150, 'Keyboard Wizard'], [250, 'Alphabet Legend'],
+  [0, 'Little Sprout'], [50, 'Busy Bee'], [120, 'Bubble Popper'],
+  [250, 'Letter Hunter'], [450, 'Key Captain'], [750, 'Keyboard Wizard'], [1200, 'Alphabet Legend'],
 ];
-const TIME_LIMIT = 5;                     // seconds; points = seconds left (5 in the first second, 0 after 5s)
-const game = { target: null, score: 0, popped: 0, over: false, overAt: 0, streak: 0, running: false, best: 0 };
+const TIME_LIMIT = 5;                     // seconds for the speed bonus to drain
+
+// Challenge scoring: points = 10 × difficulty × speed × streak
+//  - difficulty: log2(options), i.e. how unlikely a lucky guess is (3 tiles 1.6, 8 tiles 3, full keyboard 4.7)
+//  - speed: 1.0 when instant, draining smoothly to a 0.3 floor over 5s, so slow-but-right always scores
+//  - streak: ×1.1 per correct answer in a row, up to ×2 (one wrong answer ends the game)
+function optionCount() { return TOUCH_ONLY ? Math.max(2, game.choices.length) : (game.popped >= 12 ? 36 : 26); }
+function speedFactor(g) { return 0.3 + 0.7 * Math.max(0, 1 - Math.max(0, g.t - 0.3) / TIME_LIMIT); }
+function streakFactor() { return 1 + 0.1 * Math.min(game.streak, 10); }
+function pointsFor(g) { return Math.max(1, Math.round(10 * Math.log2(optionCount()) * speedFactor(g) * streakFactor())); }
+// Touch screens: more tiles as you go (and more points per answer)
+function tileCount() { return mode === 'find' ? 3 : game.popped >= 20 ? 8 : game.popped >= 10 ? 6 : game.popped >= 5 ? 4 : 3; }
+const game = { choices: [], target: null, score: 0, popped: 0, over: false, overAt: 0, streak: 0, running: false, best: 0 };
 
 // High scores are saved per player name, on this device only (names never go to analytics)
 let board = [];
@@ -562,6 +562,40 @@ function saveBoard() {
 const floaters = [];
 let miniFlash = null, nextTargetTimer = 0;
 
+// Phones and tablets: a few big letter tiles to tap instead of a keyboard (toddler-sized targets)
+function choiceLayout() {
+  const n = Math.max(1, game.choices.length);
+  const margin = 16, gap = Math.max(12, Math.min(W, H) * 0.03), budget = H * 0.42;
+  // one row or two, whichever gives bigger (more toddler-friendly) tiles
+  const fit = c => { const r = Math.ceil(n / c); return Math.min((W - margin * 2 - gap * (c - 1)) / c, (budget - gap * (r - 1)) / r, 210); };
+  const cols = n > 1 && fit(Math.ceil(n / 2)) > fit(n) * 1.05 ? Math.ceil(n / 2) : n, rows = Math.ceil(n / cols);
+  const size = fit(cols);
+  const x0 = (W - (cols * size + (cols - 1) * gap)) / 2;
+  const y0 = H - rows * size - (rows - 1) * gap - Math.max(20, H * 0.05);
+  const pos = i => {
+    const row = Math.floor(i / cols), inRow = Math.min(cols, n - row * cols);
+    const rx = (W - (inRow * size + (inRow - 1) * gap)) / 2;
+    return [rx + (i % cols) * (size + gap), y0 + row * (size + gap)];
+  };
+  return { size, gap, x0, y0, pos };
+}
+function choiceAt(px, py) {
+  const { size, gap, pos } = choiceLayout();
+  for (let i = 0; i < game.choices.length; i++) {
+    const [x, y] = pos(i);
+    if (px >= x - gap / 2 && px <= x + size + gap / 2 && py >= y - gap / 2 && py <= y + size + gap / 2) return game.choices[i];
+  }
+  return null;
+}
+function makeChoices(ch, pool) {
+  const n = tileCount();
+  const set = [ch];
+  const same = /\d/.test(ch) ? DIGITS : LETTERS;
+  while (set.length < n) { const c = pick(same); if (!set.includes(c)) set.push(c); }
+  set.sort(() => Math.random() - 0.5);
+  game.choices = set.map(c => ({ ch: c, t: 0, wobble: 0, dim: false, seed: rand(1, 999) }));
+}
+
 function codeFor(ch) { return /\d/.test(ch) ? 'Digit' + ch : 'Key' + ch; }
 
 function newTarget() {
@@ -569,25 +603,26 @@ function newTarget() {
   let ch;
   do ch = pick(pool); while (game.target && ch === game.target.label);
   const info = keyInfo(codeFor(ch));
+  if (TOUCH_ONLY) makeChoices(ch, pool);
   const kb = showKeyboard() ? miniLayout() : null;
-  const top = mode === 'challenge' ? (H < 520 ? 46 : H * 0.16) : H * 0.12;
-  const bottom = kb ? kb.y0 - kb.gap * 2 : H * 0.8;
-  const r = Math.min(W, H) * (mode === 'find' ? 0.15 : 0.13) * (kb && TOUCH_ONLY ? 0.8 : 1);
+  const top = mode === 'challenge' ? (H < 520 ? 46 : H * 0.16) : H * 0.1;
+  const bottom = TOUCH_ONLY ? choiceLayout().y0 - 16 : kb ? kb.y0 - kb.gap * 2 : H * 0.8;
   const pad = mode === 'challenge' ? 1.35 : 1.15;
+  const r = Math.min(Math.min(W, H) * (mode === 'find' ? 0.15 : 0.13), (bottom - top) / (2 * pad));
   const cy = Math.max(top + r * pad, Math.min(bottom - r * pad, rand(top + r * pad, bottom - r * pad)));
   game.target = {
     label: ch, info, hue: info.hue,
     x: rand(0.25, 0.75) * W, y: cy,
     r,
-    t: 0, wobble: 0, dying: false, dieT: 0, lastPts: TIME_LIMIT,
+    t: 0, wobble: 0, dying: false, dieT: 0, lastSec: 0,
   };
 }
 
 // Points for the current bubble: 5 in the first second, then one less each second, 0 after 5s
-function pointsFor(g) { return Math.max(0, TIME_LIMIT - Math.floor(Math.max(0, g.t - 0.3))); }
 
 function beginGame() {
-  game.score = 0; game.popped = 0; game.over = false; game.streak = 0; game.target = null; game.running = true;
+  game.choices = [];
+  game.score = 0; game.popped = 0; game.bestStreak = 0; game.over = false; game.streak = 0; game.target = null; game.running = true;
   game.best = bestFor(player);
   updateHud();
   document.getElementById('gameover').classList.remove('open');
@@ -610,7 +645,10 @@ function floater(text, x, y, hue, size = 1) {
 
 function hitTarget(k) {
   const g = game.target;
+  const pts = mode === 'challenge' ? pointsFor(g) : 0;   // before the tiles are cleared: tile count sets difficulty
+  const fast = speedFactor(g) > 0.86;
   game.target = null;
+  game.choices = [];
   stats.hits++;
   game.streak++;
   instruments[k.inst](note(k.base, k.i));
@@ -623,12 +661,14 @@ function hitTarget(k) {
   tintBackground(g.hue);
   shake = Math.max(shake, 7);
   if (mode === 'challenge') {
-    const pts = pointsFor(g);
     game.score += pts;
     game.popped++;
+    game.bestStreak = Math.max(game.bestStreak || 0, game.streak);
     if (game.score > game.best) game.best = game.score;
     updateHud(true);
-    floater(pts === TIME_LIMIT ? '+5 Speedy!' : `+${pts}`, g.x, g.y - g.r * 0.4, pts ? g.hue : 220, pts === TIME_LIMIT ? 1.1 : 1.2);
+    floater(`+${pts}${fast ? ' Speedy!' : ''}`, g.x, g.y - g.r * 0.4, g.hue, fast ? 1.1 : 1.2);
+    if (game.streak >= 3) floater(`streak ×${streakFactor().toFixed(1)}`, g.x, g.y + g.r * 0.9, g.hue, 0.7);
+    if (TOUCH_ONLY && [5, 10, 20].includes(game.popped)) floater('More tiles!', W / 2, H * 0.3, 50, 1.3);
     if (game.popped % 10 === 0) { rainbowBlast(); floater(`${game.popped} popped!`, W / 2, H * 0.4, 50, 1.6); }
   } else {
     floater(pick(CHEERS), g.x, g.y - g.r * 0.4, g.hue);
@@ -675,10 +715,10 @@ function gameOver() {
   const pos = board.indexOf(entry) + 1;
   const isNewBest = s > 0 && s > prevBest;
   const isTop = s > 0 && s > prevTop && board.length > 1;
-  track('challenge_game_over', { score: s, letters_popped: game.popped, new_personal_best: isNewBest, top_of_board: isTop, board_position: pos });
+  track('challenge_game_over', { score: s, letters_popped: game.popped, best_streak: game.bestStreak || 0, new_personal_best: isNewBest, top_of_board: isTop, board_position: pos });
 
   document.getElementById('go-score').textContent = s;
-  document.getElementById('go-label').textContent = `${s === 1 ? 'point' : 'points'} · ${game.popped} popped`;
+  document.getElementById('go-label').textContent = `${s === 1 ? 'point' : 'points'} · ${game.popped} popped · best streak ${game.bestStreak || 0}`;
   const badge = document.getElementById('go-badge');
   badge.className = 'badge' + (isNewBest ? ' new' : '');
   badge.textContent = isTop ? `★ Top of the board, ${player}! ★` : isNewBest ? `★ New high score, ${player}! ★` : `${player}'s best: ${bestFor(player)}`;
@@ -711,7 +751,7 @@ function gameOver() {
 const playerEl = document.getElementById('player');
 const playerOpen = () => playerEl.classList.contains('open');
 function openPlayer() {
-  game.running = false; game.target = null;
+  game.running = false; game.target = null; game.choices = [];
   clearTimeout(nextTargetTimer);
   updateHud();
   document.getElementById('gameover').classList.remove('open');
@@ -764,7 +804,7 @@ function syncModeButtons() {
   document.querySelectorAll('.mode').forEach(b => {
     b.setAttribute('aria-pressed', b.dataset.mode === mode);
   });
-  if (TOUCH_ONLY) document.getElementById('settings-note').textContent = 'Letter levels play sideways, with a keyboard on screen.';
+  if (TOUCH_ONLY) document.getElementById('settings-note').textContent = 'On phones and tablets, letter levels use big tap-the-matching-letter tiles.';
 }
 function openSettings() {
   syncModeButtons();
@@ -895,6 +935,15 @@ addEventListener('pointerdown', e => {
   if (mode !== 'free') {
     if (!game.running && !game.over) { if (mode === 'challenge') openPlayer(); return; }
     if (game.over) return;
+    if (TOUCH_ONLY) {
+      const c = choiceAt(e.clientX, e.clientY);
+      if (c && !c.dim) {
+        keyPress = { label: c.ch, t: 0 };
+        if (game.target && !game.target.dying && game.target.t >= 0.12 && c.ch !== game.target.label && mode === 'find') { c.dim = true; c.wobble = 1; }
+        answer(keyInfo(codeFor(c.ch)));
+        return;
+      }
+    }
     const key = showKeyboard() && keyAt(e.clientX, e.clientY);
     if (key) { keyPress = { label: key, t: 0 }; answer(keyInfo(codeFor(key))); return; }
     addPart({ kind: 'twinkle', x: e.clientX, y: e.clientY, vx: 0, vy: -30, hue: 0, size: 12, t: 0, life: 0.7, drag: 0.2, g: 0 });
@@ -1167,7 +1216,8 @@ function drawTarget(g, dt) {
   // countdown ring + points badge (Challenge)
   if (mode === 'challenge' && !g.dying) {
     const el = Math.max(0, g.t - 0.3), frac = Math.max(0, 1 - el / TIME_LIMIT), pts = pointsFor(g);
-    if (pts < g.lastPts) { g.lastPts = pts; tone(pts ? 1400 : 500, { dur: 0.06, vol: 0.05 }); g.tick = 1; }
+    const sec = Math.min(TIME_LIMIT, Math.floor(el));
+    if (sec > g.lastSec) { g.lastSec = sec; tone(sec < TIME_LIMIT ? 1400 : 600, { dur: 0.06, vol: 0.05 }); g.tick = 1; }
     g.tick = (g.tick || 0) * Math.pow(0.01, dt);
     const R = r * 1.2;
     ctx.setLineDash([2, 9]); ctx.strokeStyle = creamA(0.5); ctx.lineWidth = 2.5;
@@ -1176,12 +1226,13 @@ function drawTarget(g, dt) {
       ctx.strokeStyle = YELLOW; ctx.lineWidth = lw * 1.5; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.arc(x, y, R, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke();
     }
-    const bx = x + R * 0.72, by = y - R * 0.72, br = Math.max(18, r * 0.24) * (1 + g.tick * 0.4);
-    ctx.fillStyle = pts ? YELLOW : CREAM;
+    const bx = x + R * 0.72, by = y - R * 0.72, br = Math.max(20, r * 0.28) * (1 + g.tick * 0.4);
+    ctx.fillStyle = frac > 0 ? YELLOW : CREAM;
     ctx.beginPath(); ctx.arc(bx, by, br, 0, TAU); ctx.fill();
     wobblyCircle(bx, by, br, 2.5, CREAM, 31);
-    ctx.font = serif(br * 1.15, 700); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = SKY_DEEP; ctx.fillText(pts ? `+${pts}` : '0', bx, by + br * 0.06);
+    const label = `+${pts}`;
+    ctx.font = serif(br * (label.length > 3 ? 0.72 : label.length > 2 ? 0.88 : 1.1), 700); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = SKY_DEEP; ctx.fillText(label, bx, by + br * 0.06);
   }
 
   const fs = r * 1.1;
@@ -1196,13 +1247,13 @@ function drawTarget(g, dt) {
 const MINI_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'], MINI_OFFS = [0, 0.3, 0.8];
 let keyPress = null;
 // Shown in Find the letter, and in Challenge on phones/tablets (where it's the only way to answer)
-const showKeyboard = () => mode === 'find' || (mode === 'challenge' && TOUCH_ONLY);
+const showKeyboard = () => mode === 'find' && !TOUCH_ONLY;
 function miniLayout() {
   // big, finger-sized keys on touch screens; a smaller hint keyboard on computers
-  const ks = TOUCH_ONLY ? Math.min((W - 32) / 11.44, Math.max(40, H * 0.12), 84) : Math.min(W * 0.064, H * 0.07, 54);
+  const ks = Math.max(30, Math.min((W - 32) / 11.44, H * 0.07, 54));
   const gap = ks * 0.16;
   const totalW = 10 * ks + 9 * gap, totalH = 3 * ks + 2 * gap;
-  const x0 = (W - totalW) / 2, y0 = H - totalH - Math.max(TOUCH_ONLY ? 14 : 22, H * (TOUCH_ONLY ? 0.03 : 0.045));
+  const x0 = (W - totalW) / 2, y0 = H - totalH - Math.max(22, H * 0.045);
   return { ks, gap, totalW, totalH, x0, y0 };
 }
 function keyAt(px, py) {
@@ -1236,6 +1287,24 @@ function drawMiniKeyboard(dt, now) {
     ctx.fillStyle = isT || isWrong ? SKY_DEEP : CREAM;
     ctx.fillText(ch, x + ks / 2, y + lift + ks * 0.53);
   }));
+}
+
+function drawChoices(dt) {
+  if (keyPress) { keyPress.t += dt; if (keyPress.t > 0.25) keyPress = null; }
+  const { size, pos } = choiceLayout();
+  game.choices.forEach((c, i) => {
+    c.t += dt; c.wobble *= Math.pow(0.03, dt);
+    const s = Math.max(0.001, spring(c.t - i * 0.05));
+    const pressed = keyPress && keyPress.label === c.ch;
+    const [tx, ty] = pos(i);
+    const x = tx + size / 2 + Math.sin(c.t * 45) * c.wobble * 12;
+    const y = ty + size / 2 + Math.sin(clock * 1.6 + i) * 3 + (pressed ? size * 0.05 : 0);
+    const r = size * 0.47 * s * (pressed ? 0.95 : 1);
+    doodle('square', x, y, r, { seed: c.seed, fill: c.dim ? creamA(0.22) : CREAM, lw: Math.max(3, size * 0.025), alpha: c.dim ? 0.5 : 1, amt: 0.022 });
+    ctx.font = serif(r * 1.2, 600); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = c.dim ? creamA(0.5) : SKY_DEEP;
+    ctx.fillText(c.ch, x, y + r * 0.07);
+  });
 }
 
 function drawFloaters(dt) {
@@ -1371,9 +1440,9 @@ function frame(now) {
     if (o.t >= o.life) { pops.splice(i, 1); continue; }
   }
   for (const o of pops) drawPop(o);
-  const sideways = TOUCH_ONLY && mode !== 'free' && H > W;
-  if (game.target) drawTarget(game.target, sideways ? 0 : dt);
+  if (game.target) drawTarget(game.target, dt);
   if (started && showKeyboard() && (game.running || game.over)) drawMiniKeyboard(dt, now);
+  if (started && TOUCH_ONLY && game.choices.length) drawChoices(dt);
   drawFloaters(dt);
 
   requestAnimationFrame(frame);
