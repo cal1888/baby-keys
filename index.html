@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Rainbow Keys</title>
+<meta name="description" content="A keyboard-bashing game for babies and toddlers. Every key makes a colour, a shape and a sound.">
+<meta name="theme-color" content="#120d26">
+<meta property="og:title" content="Rainbow Keys">
+<meta property="og:description" content="A keyboard-bashing game for babies and toddlers. Every key makes a colour, a shape and a sound.">
+<meta property="og:image" content="/og.jpg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23ff6b8b'/><stop offset='.5' stop-color='%23ffd23f'/><stop offset='1' stop-color='%234fc3ff'/></linearGradient></defs><rect x='6' y='6' width='88' height='88' rx='26' fill='url(%23g)'/><text x='50' y='70' font-size='56' font-family='Arial Rounded MT Bold,Arial' font-weight='900' text-anchor='middle' fill='white'>A</text></svg>">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #120d26; user-select: none; -webkit-user-select: none; touch-action: none; }
+  body.playing { cursor: none; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #intro {
+    position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #fff; text-align: center; pointer-events: none;
+    transition: opacity .7s ease, transform .7s cubic-bezier(.3,1.6,.5,1);
+    font: 900 clamp(40px, 9vw, 120px)/1 ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif;
+  }
+  #title span {
+    display: inline-block; white-space: pre;
+    animation: hop 1.8s cubic-bezier(.4,0,.3,1) infinite;
+    text-shadow: 0 .06em 0 rgba(0,0,0,.25), 0 0 .5em currentColor;
+  }
+  #intro small { font-size: .22em; font-weight: 600; color: rgba(255,255,255,.5); margin-top: 1.6em; letter-spacing: .02em; }
+  #intro.gone { opacity: 0; transform: scale(1.25); }
+  @keyframes hop {
+    0%, 60%, 100% { transform: translateY(0) scale(1, 1); }
+    20% { transform: translateY(-.28em) scale(.92, 1.1); }
+    40% { transform: translateY(0) scale(1.12, .88); }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="intro">
+  <div id="title"></div>
+  <small>Goes full screen · Esc to exit</small>
+</div>
+<script>
+const TAU = Math.PI * 2;
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+
+// Rainbow bouncing title
+const TOUCH_ONLY = matchMedia('(hover: none) and (pointer: coarse)').matches;
+if (TOUCH_ONLY) document.querySelector('#intro small').textContent = 'Tap, tap, tap!';
+[...(TOUCH_ONLY ? 'Tap anywhere!' : 'Press any key!')].forEach((ch, i) => {
+  const s = document.createElement('span');
+  s.textContent = ch;
+  s.style.color = `hsl(${(i * 28) % 360}, 95%, 70%)`;
+  s.style.animationDelay = `${i * 0.07}s`;
+  document.getElementById('title').appendChild(s);
+});
+
+// ---------- Canvas ----------
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let W, H, dpr;
+function resize() {
+  dpr = Math.min(devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+}
+addEventListener('resize', resize);
+resize();
+
+// ---------- Audio ----------
+let ac, master, noiseBuf;
+function initAudio() {
+  if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+  ac = new (window.AudioContext || window.webkitAudioContext)();
+  const comp = ac.createDynamicsCompressor();
+  comp.threshold.value = -18; comp.ratio.value = 6;
+  comp.connect(ac.destination);
+  master = ac.createGain();
+  master.gain.value = 0.5;
+  master.connect(comp);
+  // Soft echo so every note feels a bit magical
+  const delay = ac.createDelay(); delay.delayTime.value = 0.22;
+  const fb = ac.createGain(); fb.gain.value = 0.28;
+  const wet = ac.createGain(); wet.gain.value = 0.22;
+  master.connect(delay); delay.connect(fb); fb.connect(delay); delay.connect(wet); wet.connect(comp);
+  noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+  const d = noiseBuf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+
+function tone(f, { type = 'sine', t = 0, dur = 1, vol = 0.3, attack = 0.005, slideTo = null, slideTime = 0.15 } = {}) {
+  if (!ac) return;
+  const now = ac.currentTime + t;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f, now);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, now + slideTime);
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(vol, now + attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  o.connect(g); g.connect(master);
+  o.start(now); o.stop(now + dur + 0.05);
+}
+
+function whoosh() {
+  const now = ac.currentTime;
+  const src = ac.createBufferSource(); src.buffer = noiseBuf;
+  const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 2;
+  bp.frequency.setValueAtTime(300, now);
+  bp.frequency.exponentialRampToValueAtTime(3000, now + 0.6);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.25, now + 0.15);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
+  src.connect(bp); bp.connect(g); g.connect(master);
+  src.start(now); src.stop(now + 0.9);
+}
+
+// Pentatonic scale: every combination sounds nice
+const PENTA = [0, 2, 4, 7, 9];
+const note = (base, i) => base * Math.pow(2, (12 * Math.floor(i / 5) + PENTA[i % 5]) / 12);
+const C3 = 130.81, C4 = 261.63, C5 = 523.25;
+
+const instruments = {
+  sparkle(f) { tone(f, { type: 'triangle', dur: 0.5, vol: 0.16 }); tone(f * 2, { t: 0.07, dur: 0.4, vol: 0.08 }); tone(f * 3, { t: 0.14, dur: 0.3, vol: 0.05 }); },
+  bell(f)    { tone(f, { dur: 1.6, vol: 0.26 }); tone(f * 2, { dur: 0.8, vol: 0.08 }); tone(f * 2.76, { dur: 0.3, vol: 0.04 }); },
+  marimba(f) { tone(f, { dur: 0.7, vol: 0.34 }); tone(f * 4, { dur: 0.08, vol: 0.1 }); },
+  bubble(f)  { tone(f * 0.7, { slideTo: f * 1.5, slideTime: 0.12, dur: 0.35, vol: 0.3 }); },
+};
+
+// ---------- Keyboard layout -> screen position, pitch, sound ----------
+const ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+const ROW_SOUND = [
+  { inst: 'sparkle', base: C5 },
+  { inst: 'bell',    base: C4 },
+  { inst: 'marimba', base: C3 },
+  { inst: 'bubble',  base: C4 },
+];
+
+function keyInfo(code) {
+  let ch = null;
+  if (code.startsWith('Key')) ch = code.slice(3).toLowerCase();
+  else if (code.startsWith('Digit')) ch = code.slice(5);
+  if (ch) {
+    for (let r = 0; r < ROWS.length; r++) {
+      const c = ROWS[r].indexOf(ch);
+      if (c !== -1) {
+        const n = ROWS[r].length;
+        return {
+          label: ch.toUpperCase(),
+          x: ((c + 0.5) / n) * 0.84 + 0.08,
+          y: (r + 0.5) / ROWS.length * 0.8 + 0.1,
+          hue: (c / n) * 320,
+          ...ROW_SOUND[r], i: c,
+        };
+      }
+    }
+  }
+  return null;
+}
+
+// ---------- World state ----------
+const pops = [], rings = [], parts = [], rockets = [], rainbows = [];
+const SHAPES = ['circle', 'star', 'heart', 'square', 'triangle', 'flower'];
+const flashes = [];
+let shake = 0;
+
+// Big soft colour clouds in the background that drift and pick up the latest colour
+const blobs = Array.from({ length: 4 }, (_, i) => ({
+  hue: 230 + i * 30, target: 230 + i * 30,
+  ax: rand(0.15, 0.3), ay: rand(0.12, 0.25), px: rand(0, TAU), py: rand(0, TAU),
+}));
+function tintBackground(hue) {
+  const b = pick(blobs);
+  b.target = b.hue + ((((hue - b.hue) % 360) + 540) % 360 - 180);
+}
+
+function addPart(p) { parts.push(p); if (parts.length > 1400) parts.splice(0, parts.length - 1400); }
+
+function sparks(x, y, hue, { dots = 18, confetti = 10, twinkles = 6, speed = 1 } = {}) {
+  for (let i = 0; i < dots; i++) {
+    const a = rand(0, TAU), s = rand(180, 560) * speed;
+    addPart({ kind: 'dot', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 100, hue: hue + rand(-25, 25), size: rand(3, 8), t: 0, life: rand(0.6, 1.2), drag: 0.25, g: 520 });
+  }
+  for (let i = 0; i < confetti; i++) {
+    const a = rand(0, TAU), s = rand(200, 520) * speed;
+    addPart({ kind: 'confetti', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 220, hue: hue + rand(-60, 60), size: rand(7, 13), rot: rand(0, TAU), vr: rand(-10, 10), t: 0, life: rand(1.2, 2), drag: 0.35, g: 380 });
+  }
+  for (let i = 0; i < twinkles; i++) {
+    const a = rand(0, TAU), s = rand(40, 160) * speed;
+    addPart({ kind: 'twinkle', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, hue: hue + rand(-20, 20), size: rand(6, 12), t: 0, life: rand(1.2, 2.2), drag: 0.15, g: -30 });
+  }
+}
+
+function burst(x, y, hue, { label = '', face = false, size = 1, quiet = false } = {}) {
+  const r = Math.min(W, H) * rand(0.1, 0.14) * size;
+  pops.push({ x, y, hue, r, label, face, shape: pick(SHAPES), t: 0, life: quiet ? 3 : 2.2, rot: rand(-0.3, 0.3), seed: rand(0, 100), popped: false });
+  if (pops.length > 40) pops.splice(0, pops.length - 40);
+  if (quiet) return;
+  rings.push({ x, y, hue, t: 0, life: 0.8, maxR: r * 2.8, w: 14 });
+  rings.push({ x, y, hue: hue + 40, t: -0.08, life: 0.9, maxR: r * 3.6, w: 4 });
+  sparks(x, y, hue, { speed: size });
+  flashes.push({ x, y, hue, t: 0, life: 0.6 });
+  tintBackground(hue);
+  shake = Math.max(shake, 4 * size);
+}
+
+// Little sparkle puff when a shape disappears
+function puff(o, s) {
+  for (let i = 0; i < 14; i++) {
+    const a = rand(0, TAU), rr = o.r * s * 0.9;
+    addPart({ kind: 'dot', x: o.x + Math.cos(a) * rr, y: o.y + Math.sin(a) * rr, vx: Math.cos(a) * rand(60, 200), vy: Math.sin(a) * rand(60, 200), hue: o.hue + rand(-20, 20), size: rand(2, 5), t: 0, life: rand(0.4, 0.8), drag: 0.1, g: 60 });
+  }
+  for (let i = 0; i < 3; i++) addPart({ kind: 'twinkle', x: o.x + rand(-o.r, o.r) * 0.6, y: o.y + rand(-o.r, o.r) * 0.6, vx: 0, vy: rand(-40, -10), hue: o.hue, size: rand(6, 10), t: 0, life: rand(0.6, 1.1), drag: 0.2, g: 0 });
+}
+
+function rainbowBlast() {
+  rainbows.push({ t: 0, life: 2.8 });
+  for (let i = 0; i < 90; i++) {
+    addPart({ kind: 'confetti', x: rand(0, W), y: rand(-H * 0.4, -10), vx: rand(-40, 40), vy: rand(80, 260), hue: rand(0, 360), size: rand(8, 14), rot: rand(0, TAU), vr: rand(-8, 8), t: 0, life: rand(2.5, 3.6), drag: 0.5, g: 260 });
+  }
+  const x = W / 2, y = H * 0.55;
+  for (let i = 0; i < 5; i++) rings.push({ x, y, hue: i * 70, t: -i * 0.07, life: 1.1, maxR: Math.max(W, H) * 0.6, w: 12 });
+  flashes.push({ x, y, hue: rand(0, 360), t: 0, life: 0.9, big: true });
+  blobs.forEach((b, i) => { b.target = b.hue + (((((i * 90) - b.hue) % 360) + 540) % 360 - 180); });
+  shake = 14;
+}
+
+function launchRocket(x, hue, delay) {
+  rockets.push({ x, y: H + 10, vx: rand(-40, 40), vy: -Math.sqrt(2 * 900 * (H - H * rand(0.18, 0.42))), hue, wait: delay });
+  setTimeout(() => tone(rand(300, 400), { type: 'triangle', slideTo: 1200, slideTime: 0.55, dur: 0.6, vol: 0.05 }), delay * 1000);
+}
+
+function explode(r) {
+  instruments.sparkle(note(C5, Math.floor(rand(0, 8))));
+  for (let i = 0; i < 70; i++) {
+    const a = (i / 70) * TAU, s = rand(260, 420);
+    addPart({ kind: 'dot', x: r.x, y: r.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, hue: r.hue + rand(-15, 15), size: rand(3, 6), t: 0, life: rand(1, 1.6), drag: 0.35, g: 220 });
+  }
+  sparks(r.x, r.y, r.hue, { dots: 0, confetti: 6, twinkles: 10 });
+  rings.push({ x: r.x, y: r.y, hue: r.hue, t: 0, life: 0.7, maxR: 160, w: 6 });
+  flashes.push({ x: r.x, y: r.y, hue: r.hue, t: 0, life: 0.5 });
+  tintBackground(r.hue);
+}
+
+// ---------- Analytics (cookieless PostHog: no cookies, no personal data, never which keys) ----------
+const POSTHOG_KEY = '';                          // project API key (phc_...); empty = analytics off
+const POSTHOG_HOST = 'https://eu.i.posthog.com';
+const stats = { presses: 0, taps: 0, specials: 0, startedAt: 0, sent: false };
+if (POSTHOG_KEY) {
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/posthog-js@1/dist/array.full.min.js';
+  s.async = true;
+  s.onload = () => window.posthog.init(POSTHOG_KEY, {
+    api_host: POSTHOG_HOST,
+    cookieless_mode: 'always',
+    person_profiles: 'never',
+    autocapture: false,
+    disable_session_recording: true,
+    capture_pageleave: false,
+  });
+  document.head.appendChild(s);
+}
+function track(event, props, opts) { try { window.posthog?.capture?.(event, props, opts); } catch {} }
+function endSession() {
+  if (!stats.startedAt || stats.sent) return;
+  stats.sent = true;
+  track('play_session_ended', {
+    duration_s: Math.round((performance.now() - stats.startedAt) / 1000),
+    key_presses: stats.presses, taps: stats.taps, special_keys: stats.specials,
+    touch_device: TOUCH_ONLY,
+  }, { transport: 'sendBeacon' });
+}
+addEventListener('pagehide', endSession);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') endSession();
+  else if (stats.sent) { stats.sent = false; stats.startedAt = performance.now(); stats.presses = stats.taps = stats.specials = 0; }
+});
+
+// ---------- Input ----------
+let started = false, lastPress = performance.now() - 5000, idleTimer = 0;
+function start() {
+  initAudio();
+  if (started) return;
+  started = true;
+  stats.startedAt = performance.now();
+  track('play_started', { touch_device: TOUCH_ONLY });
+  document.body.classList.add('playing');
+  document.getElementById('intro').classList.add('gone');
+  const el = document.documentElement;
+  (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)?.catch?.(() => {});
+}
+
+addEventListener('keydown', e => {
+  e.preventDefault();
+  if (e.code === 'Escape') return;       // let the browser exit full screen
+  start();
+  if (e.repeat) return;                   // holding a key down shouldn't spam
+  lastPress = performance.now();
+  stats.presses++;
+
+  const k = keyInfo(e.code);
+  if (!k) stats.specials++;
+  if (k) {
+    instruments[k.inst](note(k.base, k.i));
+    burst(k.x * W + rand(-30, 30), k.y * H + rand(-30, 30), k.hue + rand(-10, 10), { label: k.label });
+  } else if (e.code === 'Space') {
+    tone(160, { slideTo: 45, slideTime: 0.5, dur: 0.9, vol: 0.5 });
+    whoosh();
+    [0, 2, 4, 7].forEach((i, n) => instruments.bell(note(C4, i + 5), n));
+    rainbowBlast();
+  } else if (e.code === 'Enter') {
+    [0.2, 0.4, 0.6, 0.8].forEach((fx, n) => launchRocket(W * fx + rand(-40, 40), n * 80 + rand(0, 40), n * 0.12));
+  } else if (e.code === 'Backspace' || e.code === 'Delete') {
+    tone(700, { type: 'triangle', slideTo: 180, slideTime: 0.3, dur: 0.4, vol: 0.25 });
+    burst(rand(0.15, 0.85) * W, rand(0.2, 0.8) * H, 200, { face: true, size: 1.2 });
+  } else {
+    instruments.bell(note(C4, Math.floor(rand(0, 10))));
+    burst(rand(0.1, 0.9) * W, rand(0.15, 0.85) * H, rand(0, 360), { face: true });
+  }
+});
+
+addEventListener('pointerdown', e => {
+  start();
+  lastPress = performance.now();
+  stats.taps++;
+  const col = Math.min(9, Math.floor((e.clientX / W) * 10));
+  const row = Math.min(3, Math.floor((e.clientY / H) * 4));
+  instruments[ROW_SOUND[row].inst](note(ROW_SOUND[row].base, col));
+  burst(e.clientX, e.clientY, (col / 10) * 320, { face: true });
+});
+
+// Sparkle trail behind the (hidden) pointer
+let trailHue = 0, lastTrail = 0;
+addEventListener('pointermove', e => {
+  const now = performance.now();
+  if (now - lastTrail < 18) return;
+  lastTrail = now;
+  trailHue = (trailHue + 7) % 360;
+  addPart({ kind: 'twinkle', x: e.clientX, y: e.clientY, vx: rand(-30, 30), vy: rand(-30, 10), hue: trailHue, size: rand(5, 9), t: 0, life: rand(0.5, 0.9), drag: 0.2, g: 40 });
+});
+
+// Ask before closing if someone hits Cmd+W mid-play
+addEventListener('beforeunload', e => { if (started) { e.preventDefault(); e.returnValue = ''; } });
+addEventListener('contextmenu', e => e.preventDefault());
+
+// ---------- Drawing helpers ----------
+function shapePath(s, r) {
+  ctx.beginPath();
+  if (s === 'circle') ctx.arc(0, 0, r, 0, TAU);
+  else if (s === 'square') ctx.roundRect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7, r * 0.38);
+  else if (s === 'triangle') {
+    const pts = [0, 1, 2].map(i => { const a = -Math.PI / 2 + i * TAU / 3; return [Math.cos(a) * r * 1.2, Math.sin(a) * r * 1.2 + r * 0.2]; });
+    // rounded corners
+    for (let i = 0; i < 3; i++) {
+      const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % 3];
+      if (i === 0) ctx.moveTo((x1 + x2) / 2, (y1 + y2) / 2);
+      const [x3, y3] = pts[(i + 2) % 3];
+      ctx.arcTo(x2, y2, (x2 + x3) / 2, (y2 + y3) / 2, r * 0.25);
+    }
+    ctx.closePath();
+  }
+  else if (s === 'star') {
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.58 : r * 1.18; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+    ctx.closePath(); ctx.lineJoin = 'round';
+  }
+  else if (s === 'heart') {
+    for (let t = 0; t < TAU; t += 0.08) { const x = 16 * Math.sin(t) ** 3, y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t); ctx.lineTo(x * r / 15, -y * r / 15 - r * 0.1); }
+    ctx.closePath();
+  }
+  else if (s === 'flower') {
+    for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3, cx = Math.cos(a) * r * 0.6, cy = Math.sin(a) * r * 0.6; ctx.moveTo(cx + r * 0.46, cy); ctx.arc(cx, cy, r * 0.46, 0, TAU); }
+    ctx.moveTo(r * 0.6, 0); ctx.arc(0, 0, r * 0.6, 0, TAU);
+  }
+}
+const CENTER_Y = { triangle: 0.28, heart: -0.02 };
+
+// Springy scale: 0 -> overshoot -> settle at 1
+const spring = t => t <= 0 ? 0 : 1 - Math.exp(-7 * t) * Math.cos(15 * t);
+const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+
+function drawFace(o, r, cy) {
+  const blink = ((o.t + o.seed) % 3.2) < 0.12 ? 0.12 : 1;
+  const look = Math.sin(o.t * 1.3 + o.seed) * r * 0.04;
+  ctx.fillStyle = '#2b1838';
+  for (const sx of [-1, 1]) {
+    ctx.beginPath(); ctx.ellipse(sx * r * 0.28 + look, cy - r * 0.08, r * 0.09, r * 0.13 * blink, 0, 0, TAU); ctx.fill();
+  }
+  if (blink === 1) {
+    ctx.fillStyle = '#fff';
+    for (const sx of [-1, 1]) { ctx.beginPath(); ctx.arc(sx * r * 0.28 + look + r * 0.03, cy - r * 0.13, r * 0.035, 0, TAU); ctx.fill(); }
+  }
+  ctx.fillStyle = 'rgba(255,120,160,.45)';
+  for (const sx of [-1, 1]) { ctx.beginPath(); ctx.ellipse(sx * r * 0.48, cy + r * 0.12, r * 0.12, r * 0.07, 0, 0, TAU); ctx.fill(); }
+  ctx.strokeStyle = '#2b1838'; ctx.lineWidth = r * 0.06; ctx.lineCap = 'round';
+  const open = o.t < 0.5 ? 1 : 0;   // "ooh!" first, then a smile
+  ctx.beginPath();
+  if (open) { ctx.fillStyle = '#2b1838'; ctx.ellipse(0, cy + r * 0.2, r * 0.09, r * 0.11, 0, 0, TAU); ctx.fill(); }
+  else { ctx.arc(0, cy + r * 0.08, r * 0.2, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke(); }
+}
+
+function drawPop(o) {
+  const t = o.t, r = o.r;
+  const s = spring(t);
+  const wob = Math.exp(-5 * t) * Math.sin(18 * t) * 0.22;
+  let sx = s * (1 + wob), sy = s * (1 - wob), alpha = 1;
+  const k = (t - (o.life - 0.45)) / 0.45;
+  if (k > 0) {
+    if (k < 0.6) { const e = 1 + 0.18 * Math.sin((k / 0.6) * Math.PI / 2); sx *= e; sy *= e; }
+    else {
+      if (!o.popped) { o.popped = true; puff(o, sx); }
+      const e = 1.18 * (1 - easeOutCubic((k - 0.6) / 0.4)); sx *= e; sy *= e; alpha = 1 - (k - 0.6) / 0.4;
+    }
+  }
+  sx = Math.max(sx, 0.001); sy = Math.max(sy, 0.001);
+  const x = o.x + Math.sin(t * 1.7 + o.seed) * 6, y = o.y + Math.sin(t * 2.3 + o.seed) * 5;
+
+  // soft glow
+  ctx.globalCompositeOperation = 'lighter';
+  const gr = r * 2.2 * sx;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, gr);
+  g.addColorStop(0, `hsla(${o.hue},100%,60%,${0.4 * alpha})`);
+  g.addColorStop(1, `hsla(${o.hue},100%,60%,0)`);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, gr, 0, TAU); ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  ctx.rotate(o.rot + Math.sin(t * 2 + o.seed) * 0.08);
+  ctx.scale(sx, sy);
+
+  // drop shadow
+  ctx.save(); ctx.translate(0, r * 0.12); ctx.fillStyle = `hsla(${o.hue},80%,15%,.35)`; shapePath(o.shape, r); ctx.fill(); ctx.restore();
+
+  // glossy body
+  const f = ctx.createRadialGradient(-r * 0.35, -r * 0.45, r * 0.05, 0, 0, r * 1.3);
+  f.addColorStop(0, `hsl(${o.hue},100%,82%)`);
+  f.addColorStop(0.5, `hsl(${o.hue},92%,62%)`);
+  f.addColorStop(1, `hsl(${o.hue},85%,44%)`);
+  ctx.fillStyle = f; shapePath(o.shape, r); ctx.fill();
+  if (o.shape !== 'flower') { ctx.lineWidth = r * 0.05; ctx.strokeStyle = `hsla(${o.hue},100%,92%,.45)`; ctx.stroke(); }
+
+  // shine
+  ctx.fillStyle = 'rgba(255,255,255,.45)';
+  ctx.beginPath(); ctx.ellipse(-r * 0.36, -r * 0.44, r * 0.2, r * 0.1, -0.6, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(-r * 0.1, -r * 0.58, r * 0.045, 0, TAU); ctx.fill();
+
+  const cy = (CENTER_Y[o.shape] || 0.02) * r;
+  if (o.label) {
+    const ls = spring(t - 0.07);
+    ctx.save();
+    ctx.translate(0, cy);
+    ctx.rotate(Math.sin(t * 9) * 0.12 * Math.exp(-2 * t));
+    ctx.scale(Math.max(ls, 0.001), Math.max(ls, 0.001));
+    const fs = r * (o.shape === 'triangle' ? 0.8 : 1.02);
+    ctx.font = `900 ${fs}px ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = `hsl(${o.hue},75%,30%)`;
+    ctx.fillText(o.label, 0, fs * 0.1);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(o.label, 0, fs * 0.04);
+    ctx.restore();
+  } else if (o.face) {
+    drawFace(o, r, cy);
+  }
+  ctx.restore();
+}
+
+function drawTwinkle(x, y, s) {
+  ctx.beginPath();
+  ctx.moveTo(x, y - s);
+  ctx.quadraticCurveTo(x, y, x + s, y);
+  ctx.quadraticCurveTo(x, y, x, y + s);
+  ctx.quadraticCurveTo(x, y, x - s, y);
+  ctx.quadraticCurveTo(x, y, x, y - s);
+  ctx.fill();
+}
+
+// Gentle floating bokeh so the screen is never still
+const ambient = Array.from({ length: 45 }, () => ({ x: Math.random(), y: Math.random(), s: rand(1, 4), v: rand(0.01, 0.035), hue: rand(0, 360), ph: rand(0, TAU) }));
+const RAINBOW = [0, 28, 52, 130, 195, 235, 280];
+let last = performance.now(), clock = 0;
+
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; clock += dt;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  // Background: deep base + drifting colour clouds
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#120d26';
+  ctx.fillRect(0, 0, W, H);
+  const R = Math.max(W, H) * 0.65;
+  for (const b of blobs) {
+    b.hue += (b.target - b.hue) * Math.min(1, dt * 1.5);
+    const bx = W * (0.5 + Math.sin(clock * b.ax + b.px) * 0.4), by = H * (0.5 + Math.cos(clock * b.ay + b.py) * 0.4);
+    const g = ctx.createRadialGradient(bx, by, 0, bx, by, R);
+    g.addColorStop(0, `hsla(${b.hue},75%,42%,.32)`);
+    g.addColorStop(1, `hsla(${b.hue},75%,42%,0)`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  for (let i = flashes.length - 1; i >= 0; i--) {
+    const f = flashes[i]; f.t += dt;
+    const p = f.t / f.life;
+    if (p >= 1) { flashes.splice(i, 1); continue; }
+    const fr = Math.max(W, H) * (f.big ? 1.2 : 0.7) * (0.4 + p * 0.6);
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, fr);
+    g.addColorStop(0, `hsla(${f.hue},100%,65%,${0.35 * (1 - p)})`);
+    g.addColorStop(1, `hsla(${f.hue},100%,65%,0)`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+
+  // Idle attract mode: friendly faces drift in to say hi
+  const idle = now - lastPress > 7000;
+  if (idle) {
+    idleTimer -= dt;
+    if (idleTimer <= 0) {
+      idleTimer = started ? 2.4 : 1.6;
+      burst(rand(0.12, 0.88) * W, rand(0.15, 0.85) * H, rand(0, 360), { face: true, size: 0.7, quiet: true });
+    }
+  } else idleTimer = 0.8;
+
+  // Camera shake (foreground only)
+  shake *= Math.pow(0.004, dt);
+  if (shake > 0.3) ctx.translate(rand(-shake, shake), rand(-shake, shake));
+
+  ctx.globalCompositeOperation = 'lighter';
+  for (const a of ambient) {
+    a.y -= a.v * dt * (idle ? 2 : 1);
+    if (a.y < -0.02) { a.y = 1.02; a.x = Math.random(); }
+    const tw = 0.5 + 0.5 * Math.sin(clock * 2 + a.ph);
+    ctx.fillStyle = `hsla(${a.hue},90%,70%,${(idle ? 0.45 : 0.25) * (0.5 + tw * 0.5)})`;
+    ctx.beginPath(); ctx.arc(a.x * W + Math.sin(clock * 0.7 + a.ph) * 12, a.y * H, a.s * (idle ? 1.8 : 1), 0, TAU); ctx.fill();
+  }
+
+  // Rainbow arc (spacebar)
+  ctx.globalCompositeOperation = 'source-over';
+  for (let i = rainbows.length - 1; i >= 0; i--) {
+    const rb = rainbows[i]; rb.t += dt;
+    const p = rb.t / rb.life;
+    if (p >= 1) { rainbows.splice(i, 1); continue; }
+    const sweep = easeOutCubic(Math.min(1, rb.t / 0.9));
+    const alpha = p > 0.7 ? 1 - (p - 0.7) / 0.3 : 1;
+    const Rr = Math.min(W * 0.46, H * 0.78), band = Rr * 0.075, cx = W / 2, cyy = H * 0.98;
+    ctx.lineCap = 'round';
+    RAINBOW.forEach((h, j) => {
+      ctx.strokeStyle = `hsla(${h},95%,62%,${alpha * 0.9})`;
+      ctx.lineWidth = band * 0.92;
+      ctx.beginPath(); ctx.arc(cx, cyy, Rr - j * band, Math.PI, Math.PI + Math.PI * sweep); ctx.stroke();
+    });
+    // a sparkle at the leading tip
+    if (sweep < 1) {
+      const a = Math.PI + Math.PI * sweep, rr = Rr - 3 * band;
+      addPart({ kind: 'twinkle', x: cx + Math.cos(a) * rr, y: cyy + Math.sin(a) * rr, vx: rand(-60, 60), vy: rand(-60, 60), hue: rand(0, 360), size: rand(8, 14), t: 0, life: 0.8, drag: 0.2, g: 0 });
+    }
+  }
+
+  // Rings
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = rings.length - 1; i >= 0; i--) {
+    const g = rings[i]; g.t += dt;
+    if (g.t < 0) continue;
+    const p = g.t / g.life;
+    if (p >= 1) { rings.splice(i, 1); continue; }
+    ctx.strokeStyle = `hsla(${g.hue},95%,65%,${(1 - p) * 0.9})`;
+    ctx.lineWidth = g.w * (1 - p) + 1;
+    ctx.beginPath(); ctx.arc(g.x, g.y, g.maxR * easeOutCubic(p), 0, TAU); ctx.stroke();
+  }
+
+  // Rockets (Enter)
+  for (let i = rockets.length - 1; i >= 0; i--) {
+    const r = rockets[i];
+    if (r.wait > 0) { r.wait -= dt; continue; }
+    r.vy += 900 * dt; r.x += r.vx * dt; r.y += r.vy * dt;
+    addPart({ kind: 'dot', x: r.x, y: r.y, vx: rand(-30, 30), vy: rand(20, 80), hue: 40, size: rand(2, 4), t: 0, life: rand(0.3, 0.6), drag: 0.3, g: 100 });
+    ctx.fillStyle = `hsl(${r.hue},100%,80%)`;
+    ctx.beginPath(); ctx.arc(r.x, r.y, 5, 0, TAU); ctx.fill();
+    if (r.vy >= -30) { explode(r); rockets.splice(i, 1); }
+  }
+
+  // Particles
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const q = parts[i]; q.t += dt;
+    const p = q.t / q.life;
+    if (p >= 1) { parts.splice(i, 1); continue; }
+    const d = Math.pow(q.drag, dt);
+    q.vx *= d; q.vy = q.vy * d + q.g * dt;
+    q.x += q.vx * dt; q.y += q.vy * dt;
+    const a = 1 - p * p;
+    if (q.kind === 'dot') {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `hsla(${q.hue},95%,65%,${a})`;
+      ctx.beginPath(); ctx.arc(q.x, q.y, q.size * (1 - p * 0.6), 0, TAU); ctx.fill();
+    } else if (q.kind === 'twinkle') {
+      ctx.globalCompositeOperation = 'lighter';
+      const tw = 0.6 + 0.4 * Math.sin(q.t * 18 + q.size);
+      ctx.fillStyle = `hsla(${q.hue},100%,85%,${a * tw})`;
+      drawTwinkle(q.x, q.y, q.size * (p < 0.2 ? p / 0.2 : 1) * tw);
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      q.rot += q.vr * dt;
+      q.x += Math.sin(q.t * 4 + q.size) * 30 * dt;
+      ctx.save();
+      ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.scale(1, Math.cos(q.t * 9 + q.size));
+      ctx.fillStyle = `hsla(${q.hue},90%,${60 + Math.sin(q.t * 9) * 12}%,${a})`;
+      ctx.fillRect(-q.size / 2, -q.size / 4, q.size, q.size / 2);
+      ctx.restore();
+    }
+  }
+
+  // Shapes on top
+  ctx.globalCompositeOperation = 'source-over';
+  for (let i = pops.length - 1; i >= 0; i--) {
+    const o = pops[i]; o.t += dt;
+    o.y -= 14 * dt;
+    if (o.t >= o.life) { pops.splice(i, 1); continue; }
+  }
+  for (const o of pops) drawPop(o);
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
