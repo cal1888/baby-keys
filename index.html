@@ -153,6 +153,49 @@
   .again.show { opacity: 1; animation: pulse 1.4s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .45; } }
 
+  #rotate { display: none; position: fixed; inset: 0; z-index: 20; background: var(--sky); color: var(--cream);
+    flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; }
+  #rotate p { margin: 18px 0 0; font: 500 34px var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; }
+  #rotate small { font-size: 11px; opacity: .85; }
+  #rotate .phone { width: 64px; height: 110px; border: 3px solid var(--cream); border-radius: 16px; display: grid; place-items: center;
+    animation: turn 2.4s cubic-bezier(.6,0,.3,1) infinite; }
+  #rotate .phone span { width: 34px; height: 34px; border-radius: 10px; background: var(--yellow); color: var(--ink); display: grid; place-items: center; font: 600 20px var(--serif); }
+  @keyframes turn { 0%, 20% { transform: rotate(0); } 55%, 85% { transform: rotate(-90deg); } 100% { transform: rotate(0); } }
+  @media (orientation: portrait) { body.touch.letters:not(.menu) #rotate { display: flex; } }
+  body.touch.letters #gear { z-index: 21; }
+
+  /* Short screens (phones held sideways): compact cards and score bar */
+  .card { touch-action: pan-y; }
+  @media (max-height: 520px) {
+    #hud { top: 8px; gap: 6px; }
+    #hud span { padding: 4px 12px; font-size: 10px; }
+    #hud #hud-name { font-size: 14px; }
+    #hud b { font-size: 18px; margin-left: 6px; }
+    #gear { top: 8px; right: 8px; width: 40px; height: 40px; }
+    .card { padding: 18px 22px; border-radius: 22px; max-height: calc(100vh - 16px); }
+    .overlay { padding: 8px; }
+    .card h2 { font-size: 26px; }
+    .card .sub { margin: 4px 0 12px; font-size: 13px; }
+    .mode { padding: 12px 14px; gap: 4px; }
+    .mode .icon { width: 34px; height: 34px; font-size: 18px; }
+    .mode b { font-size: 18px; }
+    .mode small { font-size: 12px; }
+    .foot { margin-top: 12px; }
+    .cta { padding: 10px 24px; font-size: 17px; }
+    #player-name { padding: 10px 16px; font-size: 24px; }
+    #gameover .card { width: min(620px, 100%); display: grid; grid-template-columns: 1fr 1fr; column-gap: 20px; align-items: center; }
+    #gameover .card > * { grid-column: 1; }
+    #gameover .board, #gameover .again, #gameover .ghost { grid-column: 2; }
+    #gameover .board { grid-row: 1 / span 3; margin: 0; }
+    #gameover .again { grid-row: 4; margin-top: 8px; }
+    #gameover .ghost { grid-row: 5; justify-self: center; margin-top: 6px; }
+    .go-title { font-size: 26px; }
+    .go-score { font-size: 64px; margin: 4px 0 0; }
+    .badge { margin: 8px 0 2px; font-size: 14px; padding: 6px 12px; }
+    .rank { font-size: 18px; margin-top: 4px; }
+    .board li { padding: 4px 10px; }
+  }
+
   @media (max-width: 680px) {
     .modes { grid-template-columns: 1fr; }
     .card { padding: 22px; border-radius: 26px; }
@@ -202,6 +245,12 @@
   </div>
 </div>
 
+<div id="rotate" aria-live="polite">
+  <div class="phone" aria-hidden="true"><span>A</span></div>
+  <p>Turn me sideways</p>
+  <small class="caps">Letter games play best this way</small>
+</div>
+
 <div id="hud"><span id="hud-name"></span><span>Score<b id="score">0</b></span><span>Best<b id="best">0</b></span></div>
 
 <div id="player" class="overlay" role="dialog" aria-modal="true" aria-labelledby="player-title">
@@ -237,7 +286,7 @@ const TOUCH_ONLY = matchMedia('(hover: none) and (pointer: coarse)').matches;
 const MODES = ['free', 'find', 'challenge'];
 const store = (area, k, v) => { try { if (v === undefined) return window[area].getItem(k); window[area].setItem(k, v); } catch { return null; } };
 let mode = new URLSearchParams(location.search).get('mode') || store('localStorage', 'babykeys-mode') || 'free';
-if (!MODES.includes(mode) || (TOUCH_ONLY && mode !== 'free')) mode = 'free';
+if (!MODES.includes(mode)) mode = 'free';
 
 // Rainbow bouncing title
 const INTRO = {
@@ -245,7 +294,13 @@ const INTRO = {
   find: 'Find the letter!',
   challenge: 'Ready? Press a key!',
 };
+function syncBodyMode() {
+  document.body.classList.toggle('touch', TOUCH_ONLY);
+  document.body.classList.toggle('letters', mode !== 'free');
+  if (TOUCH_ONLY && mode !== 'free' && document.fullscreenElement) screen.orientation?.lock?.('landscape').catch(() => {});
+}
 function setTitle() {
+  syncBodyMode();
   const t = document.getElementById('title');
   t.innerHTML = '';
   [...INTRO[mode]].forEach((ch, i) => {
@@ -510,15 +565,20 @@ let miniFlash = null, nextTargetTimer = 0;
 function codeFor(ch) { return /\d/.test(ch) ? 'Digit' + ch : 'Key' + ch; }
 
 function newTarget() {
-  const pool = mode === 'challenge' && game.popped >= 12 ? LETTERS.concat(DIGITS) : LETTERS;
+  const pool = mode === 'challenge' && game.popped >= 12 && !TOUCH_ONLY ? LETTERS.concat(DIGITS) : LETTERS;
   let ch;
   do ch = pick(pool); while (game.target && ch === game.target.label);
   const info = keyInfo(codeFor(ch));
-  const yRange = mode === 'find' ? [0.2, 0.46] : [0.28, 0.68];
+  const kb = showKeyboard() ? miniLayout() : null;
+  const top = mode === 'challenge' ? (H < 520 ? 46 : H * 0.16) : H * 0.12;
+  const bottom = kb ? kb.y0 - kb.gap * 2 : H * 0.8;
+  const r = Math.min(W, H) * (mode === 'find' ? 0.15 : 0.13) * (kb && TOUCH_ONLY ? 0.8 : 1);
+  const pad = mode === 'challenge' ? 1.35 : 1.15;
+  const cy = Math.max(top + r * pad, Math.min(bottom - r * pad, rand(top + r * pad, bottom - r * pad)));
   game.target = {
     label: ch, info, hue: info.hue,
-    x: rand(0.25, 0.75) * W, y: rand(...yRange) * H,
-    r: Math.min(W, H) * (mode === 'find' ? 0.15 : 0.13),
+    x: rand(0.25, 0.75) * W, y: cy,
+    r,
     t: 0, wobble: 0, dying: false, dieT: 0, lastPts: TIME_LIMIT,
   };
 }
@@ -691,6 +751,11 @@ function submitPlayer() {
 document.getElementById('player-name').addEventListener('input', syncPlayerButton);
 document.getElementById('player-form').addEventListener('submit', e => { e.preventDefault(); submitPlayer(); });
 document.getElementById('go-player').addEventListener('click', openPlayer);
+document.getElementById('gameover').addEventListener('pointerdown', e => {
+  if (e.target.closest('#go-player')) return;
+  if (game.over && performance.now() - game.overAt > 1800) beginGame();
+});
+if (TOUCH_ONLY) document.getElementById('go-again').textContent = 'Tap to play again';
 
 // ---------- Settings ----------
 const settingsEl = document.getElementById('settings');
@@ -698,12 +763,8 @@ const settingsOpen = () => settingsEl.classList.contains('open');
 function syncModeButtons() {
   document.querySelectorAll('.mode').forEach(b => {
     b.setAttribute('aria-pressed', b.dataset.mode === mode);
-    if (TOUCH_ONLY && b.dataset.mode !== 'free') {
-      b.disabled = true;
-      b.querySelector('small').textContent = 'Needs a keyboard.';
-    }
   });
-  if (TOUCH_ONLY) document.getElementById('settings-note').textContent = 'Letter levels need a keyboard.';
+  if (TOUCH_ONLY) document.getElementById('settings-note').textContent = 'Letter levels play sideways, with a keyboard on screen.';
 }
 function openSettings() {
   syncModeButtons();
@@ -759,7 +820,8 @@ function start() {
   document.body.classList.add('playing');
   document.getElementById('intro').classList.add('gone');
   const el = document.documentElement;
-  (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)?.catch?.(() => {});
+  const fs = (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+  fs?.then?.(syncBodyMode).catch?.(() => {});
   if (mode === 'find') beginGame();
   if (mode === 'challenge') openPlayer();
   updateHud();
@@ -814,11 +876,15 @@ addEventListener('keydown', e => {
     if (!MODIFIERS.test(e.code)) addPart({ kind: 'twinkle', x: rand(0.2, 0.8) * W, y: rand(0.2, 0.8) * H, vx: 0, vy: -20, hue: rand(0, 360), size: 9, t: 0, life: 0.6, drag: 0.2, g: 0 });
     return;
   }
+  answer(k);
+});
+
+function answer(k) {
   const g = game.target;
   if (!g || g.dying || g.t < 0.12) return; // ignore presses while the next bubble is arriving
   if (k.label === g.label) hitTarget(k);
   else missTarget(k);
-});
+}
 
 addEventListener('pointerdown', e => {
   if (e.target.closest('#gear, .overlay')) return;
@@ -827,7 +893,11 @@ addEventListener('pointerdown', e => {
   lastPress = performance.now();
   stats.taps++;
   if (mode !== 'free') {
-    addPart({ kind: 'twinkle', x: e.clientX, y: e.clientY, vx: 0, vy: -30, hue: rand(0, 360), size: 12, t: 0, life: 0.7, drag: 0.2, g: 0 });
+    if (!game.running && !game.over) { if (mode === 'challenge') openPlayer(); return; }
+    if (game.over) return;
+    const key = showKeyboard() && keyAt(e.clientX, e.clientY);
+    if (key) { keyPress = { label: key, t: 0 }; answer(keyInfo(codeFor(key))); return; }
+    addPart({ kind: 'twinkle', x: e.clientX, y: e.clientY, vx: 0, vy: -30, hue: 0, size: 12, t: 0, life: 0.7, drag: 0.2, g: 0 });
     return;
   }
   const col = Math.min(9, Math.floor((e.clientX / W) * 10));
@@ -1120,11 +1190,29 @@ function drawTarget(g, dt) {
 
 // ---------- Little keyboard (Find the letter) ----------
 const MINI_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'], MINI_OFFS = [0, 0.3, 0.8];
+let keyPress = null;
+// Shown in Find the letter, and in Challenge on phones/tablets (where it's the only way to answer)
+const showKeyboard = () => mode === 'find' || (mode === 'challenge' && TOUCH_ONLY);
+function miniLayout() {
+  // big, finger-sized keys on touch screens; a smaller hint keyboard on computers
+  const ks = TOUCH_ONLY ? Math.min((W - 32) / 11.44, Math.max(40, H * 0.12), 84) : Math.min(W * 0.064, H * 0.07, 54);
+  const gap = ks * 0.16;
+  const totalW = 10 * ks + 9 * gap, totalH = 3 * ks + 2 * gap;
+  const x0 = (W - totalW) / 2, y0 = H - totalH - Math.max(TOUCH_ONLY ? 14 : 22, H * (TOUCH_ONLY ? 0.03 : 0.045));
+  return { ks, gap, totalW, totalH, x0, y0 };
+}
+function keyAt(px, py) {
+  const { ks, gap, x0, y0 } = miniLayout();
+  for (let r = 0; r < 3; r++) for (let c = 0; c < MINI_ROWS[r].length; c++) {
+    const x = x0 + (c + MINI_OFFS[r]) * (ks + gap), y = y0 + r * (ks + gap);
+    if (px >= x - gap / 2 && px <= x + ks + gap / 2 && py >= y - gap / 2 && py <= y + ks + gap / 2) return MINI_ROWS[r][c];
+  }
+  return null;
+}
 function drawMiniKeyboard(dt, now) {
   if (miniFlash) { miniFlash.t += dt; if (miniFlash.t > 0.6) miniFlash = null; }
-  const ks = Math.min(W * 0.064, H * 0.07, 54), gap = ks * 0.16;
-  const totalW = 10 * ks + 9 * gap, totalH = 3 * ks + 2 * gap;
-  const x0 = (W - totalW) / 2, y0 = H - totalH - Math.max(22, H * 0.045);
+  if (keyPress) { keyPress.t += dt; if (keyPress.t > 0.25) keyPress = null; }
+  const { ks, gap, totalW, totalH, x0, y0 } = miniLayout();
   ctx.fillStyle = 'rgba(79,128,184,.55)';
   ctx.beginPath(); ctx.roundRect(x0 - gap * 2, y0 - gap * 2, totalW + gap * 4, totalH + gap * 4, ks * 0.45); ctx.fill();
   const tgt = game.target && !game.target.dying ? game.target : null;
@@ -1135,10 +1223,11 @@ function drawMiniKeyboard(dt, now) {
     const x = x0 + (c + MINI_OFFS[r]) * (ks + gap), y = y0 + r * (ks + gap);
     const isT = tgt && tgt.label === ch;
     const isWrong = miniFlash && miniFlash.label === ch;
-    const lift = isT ? -ks * 0.14 * pulse : 0;
+    const pressed = keyPress && keyPress.label === ch;
+    const lift = pressed ? ks * 0.08 : isT && !TOUCH_ONLY ? -ks * 0.14 * pulse : 0;
     const seed = r * 10 + c;
     const pts = place(OUTLINES.square, x + ks / 2, y + ks / 2 + lift, ks * 0.56, 1, 1, 0, seed + boil, 0.025);
-    if (isT || isWrong) { smoothClosed(pts); ctx.fillStyle = isT ? YELLOW : creamA(0.7 * (1 - miniFlash.t / 0.6) + 0.1); ctx.fill(); }
+    if (isT || isWrong || pressed) { smoothClosed(pts); ctx.fillStyle = isT ? YELLOW : isWrong ? creamA(0.7 * (1 - miniFlash.t / 0.6) + 0.1) : creamA(0.35); ctx.fill(); }
     sketchStroke(pts, seed % 20, 2, isT ? CREAM : creamA(0.75));
     ctx.fillStyle = isT || isWrong ? SKY_DEEP : CREAM;
     ctx.fillText(ch, x + ks / 2, y + lift + ks * 0.53);
@@ -1153,7 +1242,8 @@ function drawFloaters(dt) {
     const sc = spring(f.t) * f.size;
     ctx.save();
     ctx.globalAlpha = p > 0.6 ? 1 - (p - 0.6) / 0.4 : 1;
-    ctx.translate(f.x, f.y - easeOutCubic(p) * 80);
+    const minY = mode === 'challenge' ? (H < 520 ? 64 : 110) : 40;   // stay clear of the score bar
+    ctx.translate(f.x, Math.max(minY, f.y - easeOutCubic(p) * Math.min(80, H * 0.12)));
     ctx.rotate(-0.06);
     ctx.scale(sc, sc);
     ctx.font = serif(Math.min(W, H) * 0.058, 650, true);
@@ -1277,8 +1367,9 @@ function frame(now) {
     if (o.t >= o.life) { pops.splice(i, 1); continue; }
   }
   for (const o of pops) drawPop(o);
-  if (game.target) drawTarget(game.target, dt);
-  if (mode === 'find' && started) drawMiniKeyboard(dt, now);
+  const sideways = TOUCH_ONLY && mode !== 'free' && H > W;
+  if (game.target) drawTarget(game.target, sideways ? 0 : dt);
+  if (started && showKeyboard() && (game.running || game.over)) drawMiniKeyboard(dt, now);
   drawFloaters(dt);
 
   requestAnimationFrame(frame);
