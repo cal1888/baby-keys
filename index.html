@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Baby Keys</title>
 <meta name="description" content="A keyboard game for babies and toddlers. Every key makes a colour, a shape and a sound, with letter-finding levels for when they're ready.">
-<meta name="theme-color" content="#120d26">
+<meta name="theme-color" content="#6c9dd2">
 <meta property="og:title" content="Baby Keys">
 <meta property="og:description" content="A keyboard game for babies and toddlers. Every key makes a colour, a shape and a sound.">
 <meta property="og:image" content="https://babykeys.link/og.jpg">
@@ -15,132 +15,159 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/fraunces@5/full.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/dm-sans@5/index.css">
 <style>
-  :root { --ink: #fff; --muted: rgba(255,255,255,.62); --glass: rgba(24,16,52,.78); --line: rgba(255,255,255,.14);
-          --font: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #120d26; color: var(--ink); font-family: var(--font); user-select: none; -webkit-user-select: none; touch-action: none; }
+  :root {
+    --sky: #6c9dd2; --sky-deep: #4f80b8; --cream: #f7e8c4; --paper: #fbf4e2; --yellow: #f6c94f; --ink: #1f3d63;
+    --muted: rgba(31,61,99,.62); --line: rgba(31,61,99,.18);
+    --serif: "Fraunces Variable", Fraunces, Georgia, serif;
+    --sans: "DM Sans Variable", "DM Sans", system-ui, sans-serif;
+  }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--sky); color: var(--ink); font-family: var(--sans); user-select: none; -webkit-user-select: none; touch-action: none; }
   body.playing { cursor: none; }
   body.playing.pointer, body.menu { cursor: auto; }
   canvas { display: block; width: 100vw; height: 100vh; }
   button { font: inherit; color: inherit; }
+  .serif { font-family: var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; }
+  .caps { font-family: var(--serif); text-transform: uppercase; letter-spacing: .32em; font-weight: 400; }
 
+  /* Intro, set like the poster: a small star, a soft serif title, a spaced-out tagline */
   #intro {
     position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    text-align: center; pointer-events: none;
+    text-align: center; pointer-events: none; color: var(--cream); padding: 16px;
     transition: opacity .7s ease, transform .7s cubic-bezier(.3,1.6,.5,1);
-    font: 900 clamp(40px, 9vw, 120px)/1 var(--font);
   }
-  #title span {
-    display: inline-block; white-space: pre;
-    animation: hop 1.8s cubic-bezier(.4,0,.3,1) infinite;
-    text-shadow: 0 .06em 0 rgba(0,0,0,.25), 0 0 .5em currentColor;
-  }
-  #intro small { font-size: .22em; font-weight: 600; color: rgba(255,255,255,.5); margin-top: 1.6em; letter-spacing: .02em; }
-  #intro.gone { opacity: 0; transform: scale(1.25); }
-  @keyframes hop {
-    0%, 60%, 100% { transform: translateY(0) scale(1, 1); }
-    20% { transform: translateY(-.28em) scale(.92, 1.1); }
-    40% { transform: translateY(0) scale(1.12, .88); }
-  }
+  #intro .spark { font-size: 28px; margin-bottom: 14px; animation: twinkle 2.4s ease-in-out infinite; }
+  #title { font: 500 clamp(44px, 8.5vw, 112px)/1.02 var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; letter-spacing: -.01em; }
+  #title span { display: inline-block; white-space: pre; animation: bob 3s ease-in-out infinite; }
+  #intro .rule { width: 48px; height: 1.5px; background: var(--cream); opacity: .7; margin: 26px 0 18px; }
+  #intro .tag { font-size: clamp(11px, 1.3vw, 14px); color: var(--cream); opacity: .9; }
+  #intro .foot-note { margin-top: 14px; font-size: 10px; opacity: .6; }
+  #intro.gone { opacity: 0; transform: scale(1.08); }
+  @keyframes bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-.06em) rotate(-1deg); } }
+  @keyframes twinkle { 0%, 100% { transform: scale(1) rotate(0); opacity: .9; } 50% { transform: scale(1.25) rotate(20deg); opacity: 1; } }
 
   /* Settings button: quiet during play, wakes up when the mouse moves */
   #gear {
     position: fixed; top: 16px; right: 16px; z-index: 5; width: 48px; height: 48px; border-radius: 50%;
-    display: grid; place-items: center; border: 1px solid var(--line); background: rgba(255,255,255,.08);
-    cursor: pointer; opacity: .9; transition: opacity .4s, transform .2s, background .2s;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    display: grid; place-items: center; border: 1.5px solid var(--cream); background: transparent; color: var(--cream);
+    cursor: pointer; transition: opacity .4s, background .2s;
   }
-  #gear svg { width: 24px; height: 24px; transition: transform .6s cubic-bezier(.3,1.5,.5,1); }
-  #gear:hover { background: rgba(255,255,255,.16); }
+  #gear svg { width: 22px; height: 22px; transition: transform .6s cubic-bezier(.3,1.5,.5,1); }
+  #gear:hover { background: rgba(247,232,196,.15); }
   #gear:hover svg { transform: rotate(90deg); }
-  body.playing:not(.pointer) #gear { opacity: .18; }
-  #gear:focus-visible, .mode:focus-visible, #play:focus-visible { outline: 3px solid #ffd23f; outline-offset: 3px; }
+  body.playing:not(.pointer) #gear { opacity: .25; }
+  #gear:focus-visible, .mode:focus-visible, .cta:focus-visible, .chip:focus-visible, .ghost:focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
 
+  /* Cards: warm paper, navy ink, one yellow accent */
   .overlay {
     position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px;
-    background: rgba(10,6,24,.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    background: rgba(88,138,196,.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
     opacity: 0; pointer-events: none; transition: opacity .3s ease;
   }
   .overlay.open { opacity: 1; pointer-events: auto; }
   .card {
-    width: min(760px, 100%); max-height: calc(100vh - 32px); overflow: auto; box-sizing: border-box;
-    background: var(--glass); border: 1px solid var(--line); border-radius: 32px; padding: 32px;
-    box-shadow: 0 30px 80px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.12);
-    transform: translateY(16px) scale(.96); transition: transform .45s cubic-bezier(.3,1.5,.5,1);
+    width: min(780px, 100%); max-height: calc(100vh - 32px); overflow: auto; box-sizing: border-box;
+    background: var(--paper); border-radius: 30px; padding: 34px; color: var(--ink);
+    box-shadow: 0 24px 60px rgba(20,45,80,.35);
+    transform: translateY(16px) scale(.97); transition: transform .45s cubic-bezier(.3,1.5,.5,1);
   }
   .overlay.open .card { transform: none; }
-  .card h2 { margin: 0; font-size: 34px; font-weight: 900; letter-spacing: -.01em; }
-  .card .sub { margin: 6px 0 22px; color: var(--muted); font-size: 17px; font-weight: 600; }
+  .card h2 { margin: 0; font: 600 40px/1.05 var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; }
+  .card .sub { margin: 8px 0 24px; color: var(--muted); font-size: 16px; font-weight: 500; }
   .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
   .mode {
     position: relative; text-align: left; cursor: pointer; padding: 18px 18px 20px; border-radius: 22px;
-    border: 2px solid var(--line); background: rgba(255,255,255,.05); display: flex; flex-direction: column; gap: 8px;
+    border: 1.5px solid var(--line); background: #fff8e8; display: flex; flex-direction: column; gap: 8px;
     transition: transform .2s cubic-bezier(.3,1.6,.5,1), border-color .2s, background .2s;
   }
-  .mode:hover:not(:disabled) { transform: translateY(-3px); background: rgba(255,255,255,.09); }
-  .mode[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 18%, transparent); }
-  .mode:disabled { opacity: .4; cursor: not-allowed; }
-  .mode .icon { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; font-size: 26px; font-weight: 900;
-    background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--c) 40%, white), var(--c) 55%, color-mix(in srgb, var(--c) 70%, black));
-    box-shadow: 0 6px 18px color-mix(in srgb, var(--c) 45%, transparent); }
-  .mode b { font-size: 20px; font-weight: 900; }
-  .mode small { color: var(--muted); font-size: 14.5px; line-height: 1.35; font-weight: 600; }
-  .mode .age { position: absolute; top: 16px; right: 16px; font-size: 13px; font-weight: 800; padding: 4px 9px; border-radius: 99px; background: rgba(255,255,255,.1); color: var(--muted); }
-  .mode .check { position: absolute; top: 14px; right: 14px; width: 26px; height: 26px; border-radius: 50%; background: var(--c); display: none; place-items: center; }
+  .mode:hover:not(:disabled) { transform: translateY(-3px); border-color: var(--ink); }
+  .mode[aria-pressed="true"] { border-color: var(--ink); background: var(--yellow); }
+  .mode:disabled { opacity: .45; cursor: not-allowed; }
+  .mode .icon { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--sky); color: var(--cream);
+    font: 600 26px var(--serif); border: 1.5px solid var(--ink); }
+  .mode b { font: 600 22px var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; }
+  .mode small { color: var(--muted); font-size: 14px; line-height: 1.4; font-weight: 500; }
+  .mode[aria-pressed="true"] small { color: rgba(31,61,99,.8); }
+  .mode .age { position: absolute; top: 16px; right: 16px; font-size: 11px; font-family: var(--serif); letter-spacing: .2em; padding: 5px 10px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+  .mode .check { position: absolute; top: 14px; right: 14px; width: 28px; height: 28px; border-radius: 50%; background: var(--ink); display: none; place-items: center; }
   .mode[aria-pressed="true"] .check { display: grid; }
   .mode[aria-pressed="true"] .age { display: none; }
-  .foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 22px; flex-wrap: wrap; }
-  .foot p { margin: 0; color: var(--muted); font-size: 14px; font-weight: 600; }
-  #play {
-    cursor: pointer; border: 0; border-radius: 99px; padding: 14px 30px; font-size: 18px; font-weight: 900; color: #1b1030;
-    background: linear-gradient(90deg, #ff8fa3, #ffd23f, #7dffb0, #6fd3ff); box-shadow: 0 8px 24px rgba(255,210,63,.3);
-    transition: transform .2s cubic-bezier(.3,1.6,.5,1);
+  .foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px; flex-wrap: wrap; }
+  .foot p { margin: 0; color: var(--muted); font-size: 13px; }
+  .cta {
+    cursor: pointer; border: 1.5px solid var(--ink); border-radius: 99px; padding: 14px 32px; color: var(--ink); background: var(--yellow);
+    font: 600 20px var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; box-shadow: 0 4px 0 var(--ink);
+    transition: transform .15s, box-shadow .15s;
   }
-  #play:hover { transform: scale(1.05); }
+  .cta:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--ink); }
+  .cta:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .cta:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: 0 4px 0 var(--ink); }
+
+  #player .card { width: min(480px, 100%); text-align: center; }
+  #player-name {
+    width: 100%; box-sizing: border-box; margin-top: 4px; padding: 16px 20px; border-radius: 18px; text-align: center;
+    border: 1.5px solid var(--line); background: #fff8e8; color: var(--ink); font: 600 32px var(--serif); outline: none;
+    transition: border-color .2s; user-select: text; -webkit-user-select: text;
+  }
+  #player-name:focus { border-color: var(--ink); }
+  #player-name::placeholder { color: rgba(31,61,99,.28); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+  .chip { cursor: pointer; border: 1.5px solid var(--line); background: transparent; border-radius: 99px; padding: 7px 14px; font: 600 16px var(--serif); color: var(--ink); }
+  .chip:hover { border-color: var(--ink); background: #fff8e8; }
+  #player .foot { justify-content: center; }
+  .ghost { cursor: pointer; margin-top: 14px; border: 1.5px solid var(--line); background: transparent; border-radius: 99px; padding: 8px 16px; font-weight: 600; font-size: 14px; color: var(--muted); }
+  .ghost:hover { color: var(--ink); border-color: var(--ink); }
 
   #hud {
     position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 4; display: flex; gap: 10px;
-    opacity: 0; transition: opacity .4s; pointer-events: none;
+    opacity: 0; transition: opacity .4s; pointer-events: none; color: var(--cream);
   }
   #hud.show { opacity: 1; }
-  #hud span { padding: 10px 18px; border-radius: 99px; background: rgba(255,255,255,.08); border: 1px solid var(--line);
-    font-size: 18px; font-weight: 800; color: var(--muted); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-  #hud b { color: #fff; font-size: 24px; margin-left: 6px; display: inline-block; }
+  #hud span { padding: 8px 18px; border-radius: 99px; border: 1.5px solid var(--cream); font: 400 12px var(--serif); letter-spacing: .25em; text-transform: uppercase; display: flex; align-items: center; }
+  #hud #hud-name { background: var(--cream); color: var(--ink); letter-spacing: .05em; text-transform: none; font-size: 18px; font-weight: 600; }
+  #hud #hud-name:empty { display: none; }
+  #hud b { color: var(--cream); font: 600 26px var(--serif); letter-spacing: 0; margin-left: 10px; display: inline-block; }
   #hud b.bump { animation: bump .45s cubic-bezier(.3,1.8,.5,1); }
-  @keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.5); color: #ffd23f; } 100% { transform: scale(1); } }
+  @keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.5); color: var(--yellow); } 100% { transform: scale(1); } }
 
   #gameover .card { width: min(460px, 100%); text-align: center; }
-  .go-title { font-size: 44px; font-weight: 900; }
-  .go-score { font-size: 120px; font-weight: 900; line-height: 1; margin: 10px 0 2px;
-    background: linear-gradient(180deg, #fff, #ffd9f0); -webkit-background-clip: text; background-clip: text; color: transparent;
-    filter: drop-shadow(0 6px 24px rgba(255,150,220,.35)); }
-  .go-label { color: var(--muted); font-weight: 700; font-size: 16px; }
-  .badge { display: inline-block; margin: 16px 0 6px; padding: 8px 16px; border-radius: 99px; font-weight: 900; font-size: 17px; background: rgba(255,255,255,.1); }
-  .badge.new { color: #1b1030; background: linear-gradient(90deg, #ffd23f, #ff8fa3); animation: wiggle 1s ease-in-out infinite; }
+  .go-title { font: 600 44px var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; }
+  .go-score { font: 600 128px/1 var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; margin: 10px 0 4px; color: var(--sky-deep); }
+  .go-label { font-family: var(--serif); text-transform: uppercase; letter-spacing: .28em; font-size: 12px; color: var(--muted); }
+  .badge { display: inline-block; margin: 18px 0 6px; padding: 8px 18px; border-radius: 99px; font: 600 17px var(--serif); border: 1.5px solid var(--line); }
+  .badge.new { background: var(--yellow); border-color: var(--ink); animation: wiggle 1s ease-in-out infinite; }
   @keyframes wiggle { 0%,100% { transform: rotate(-3deg) scale(1); } 50% { transform: rotate(3deg) scale(1.06); } }
-  .rank { font-size: 24px; font-weight: 900; margin-top: 8px; }
-  .rank small { display: block; font-size: 14px; color: var(--muted); font-weight: 700; margin-bottom: 2px; }
-  .board { list-style: none; padding: 0; margin: 20px auto 0; max-width: 280px; text-align: left; counter-reset: r; }
-  .board li { counter-increment: r; display: flex; justify-content: space-between; padding: 8px 14px; border-radius: 12px; font-weight: 800; color: var(--muted); }
-  .board li::before { content: counter(r) "."; width: 28px; }
-  .board li span { flex: 1; }
-  .board li.me { background: rgba(255,210,63,.16); color: #fff; }
-  .again { margin-top: 22px; font-weight: 800; color: var(--muted); opacity: 0; transition: opacity .4s; }
+  .rank { font: 600 26px var(--serif); font-variation-settings: "SOFT" 100, "WONK" 1; margin-top: 8px; }
+  .rank small { display: block; font-size: 11px; color: var(--muted); font-weight: 400; letter-spacing: .28em; text-transform: uppercase; margin-bottom: 4px; }
+  .board { list-style: none; padding: 0; margin: 20px auto 0; max-width: 300px; text-align: left; counter-reset: r; }
+  .board li { counter-increment: r; display: flex; justify-content: space-between; padding: 8px 14px; border-radius: 12px; font-weight: 600; color: var(--muted); }
+  .board li::before { content: counter(r) "."; width: 30px; font-family: var(--serif); }
+  .board li span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; }
+  .board li b { font-family: var(--serif); font-weight: 600; }
+  .board li.me { background: var(--yellow); color: var(--ink); }
+  .board li.gap { justify-content: center; counter-increment: none; padding: 2px; }
+  .board li.gap::before { content: none; }
+  .again { margin-top: 22px; font-family: var(--serif); text-transform: uppercase; letter-spacing: .28em; font-size: 12px; color: var(--muted); opacity: 0; transition: opacity .4s; }
   .again.show { opacity: 1; animation: pulse 1.4s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .45; } }
 
   @media (max-width: 680px) {
     .modes { grid-template-columns: 1fr; }
     .card { padding: 22px; border-radius: 26px; }
-    .go-score { font-size: 96px; }
+    .go-score { font-size: 100px; }
   }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="intro">
+  <div class="spark" aria-hidden="true">✦</div>
   <div id="title"></div>
-  <small id="intro-sub">Goes full screen · Esc to exit</small>
+  <div class="rule"></div>
+  <div class="tag caps">A cozy keyboard game for tiny hands</div>
+  <div class="foot-note caps" id="intro-sub">Goes full screen · Esc to exit</div>
 </div>
 
 <button id="gear" aria-label="Choose a level">
@@ -153,39 +180,51 @@
     <p class="sub">Pick a level. You can change it any time from the button in the corner.</p>
     <div class="modes">
       <button class="mode" data-mode="free" style="--c:#ff7a9c">
-        <span class="icon">✦</span><span class="age">1+</span><span class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>
+        <span class="icon">✦</span><span class="age">1+</span><span class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f6c94f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>
         <b>Free play</b>
         <small>Every key makes a shape, a colour and a sound. Just bash away.</small>
       </button>
       <button class="mode" data-mode="find" style="--c:#35c9ff">
-        <span class="icon">A</span><span class="age">2+</span><span class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>
+        <span class="icon">A</span><span class="age">2+</span><span class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f6c94f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>
         <b>Find the letter</b>
         <small>Press the letter in the bubble to pop it. A little keyboard shows where it is.</small>
       </button>
       <button class="mode" data-mode="challenge" style="--c:#ffb321">
-        <span class="icon">★</span><span class="age">4+</span><span class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>
+        <span class="icon">5</span><span class="age">4+</span><span class="check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f6c94f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></span>
         <b>Challenge</b>
-        <small>Pop as many as you can. One wrong key and it's game over. Beat your high score!</small>
+        <small>Pop them fast: up to 5 points each. One wrong key and it's game over. High scores are saved with your name.</small>
       </button>
     </div>
     <div class="foot">
       <p id="settings-note">Tip: press Esc to leave full screen.</p>
-      <button id="play">Let's play!</button>
+      <button id="play" class="cta">Let's play!</button>
     </div>
   </div>
 </div>
 
-<div id="hud"><span>Score<b id="score">0</b></span><span>Best<b id="best">0</b></span></div>
+<div id="hud"><span id="hud-name"></span><span>Score<b id="score">0</b></span><span>Best<b id="best">0</b></span></div>
+
+<div id="player" class="overlay" role="dialog" aria-modal="true" aria-labelledby="player-title">
+  <form class="card" id="player-form" autocomplete="off">
+    <h2 id="player-title">Who's playing?</h2>
+    <p class="sub">Type your name so your high scores get saved.</p>
+    <input id="player-name" maxlength="14" spellcheck="false" placeholder="Your name" aria-label="Your name">
+    <div class="chips" id="player-chips"></div>
+    <div class="foot"><button id="player-go" class="cta" type="submit">Start!</button></div>
+    <p class="sub" style="margin:16px 0 0;font-size:13px">Names and scores are only saved on this computer.</p>
+  </form>
+</div>
 
 <div id="gameover" class="overlay" aria-live="polite">
   <div class="card">
     <div class="go-title">Game over!</div>
     <div class="go-score" id="go-score">0</div>
-    <div class="go-label" id="go-label">letters popped</div>
+    <div class="go-label" id="go-label">points</div>
     <div class="badge" id="go-badge"></div>
     <div class="rank" id="go-rank"></div>
     <ol class="board" id="go-board"></ol>
     <div class="again" id="go-again">Press any key to play again</div>
+    <button class="ghost" id="go-player" type="button">Change player</button>
   </div>
 </div>
 <script>
@@ -212,11 +251,10 @@ function setTitle() {
   [...INTRO[mode]].forEach((ch, i) => {
     const s = document.createElement('span');
     s.textContent = ch;
-    s.style.color = `hsl(${(i * 28) % 360}, 95%, 70%)`;
-    s.style.animationDelay = `${i * 0.07}s`;
+    s.style.animationDelay = `${i * 0.12}s`;
     t.appendChild(s);
   });
-  document.getElementById('intro-sub').textContent = TOUCH_ONLY ? 'Tap, tap, tap!' : 'Goes full screen · Esc to exit';
+  document.getElementById('intro-sub').textContent = TOUCH_ONLY ? 'Tap, tap, tap' : 'Goes full screen · Esc to exit';
 }
 setTitle();
 
@@ -363,10 +401,9 @@ function burst(x, y, hue, { label = '', face = false, size = 1, quiet = false } 
   if (pops.length > 40) pops.splice(0, pops.length - 40);
   if (quiet) return;
   rings.push({ x, y, hue, t: 0, life: 0.8, maxR: r * 2.8, w: 14 });
-  rings.push({ x, y, hue: hue + 40, t: -0.08, life: 0.9, maxR: r * 3.6, w: 4 });
   sparks(x, y, hue, { speed: size });
   flashes.push({ x, y, hue, t: 0, life: 0.6 });
-  tintBackground(hue);
+  cloudBounce = 1;
   shake = Math.max(shake, 4 * size);
 }
 
@@ -450,21 +487,30 @@ const LETTERS = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'];
 const DIGITS = [...'1234567890'];
 const CHEERS = ['Yay!', 'Pop!', 'Wow!', 'Yes!', 'Great!', 'Hooray!', 'Super!'];
 const RANKS = [
-  [0, 'Little Sprout'], [3, 'Busy Bee'], [6, 'Bubble Popper'],
-  [10, 'Letter Hunter'], [15, 'Key Captain'], [25, 'Keyboard Wizard'], [40, 'Alphabet Legend'],
+  [0, 'Little Sprout'], [15, 'Busy Bee'], [35, 'Bubble Popper'],
+  [60, 'Letter Hunter'], [100, 'Key Captain'], [150, 'Keyboard Wizard'], [250, 'Alphabet Legend'],
 ];
-const game = {
-  target: null, score: 0, over: false, overAt: 0, streak: 0,
-  best: +(store('sessionStorage', 'babykeys-best') || 0),
-  scores: JSON.parse(store('sessionStorage', 'babykeys-scores') || '[]'),
-};
+const TIME_LIMIT = 5;                     // seconds; points = seconds left (5 in the first second, 0 after 5s)
+const game = { target: null, score: 0, popped: 0, over: false, overAt: 0, streak: 0, running: false, best: 0 };
+
+// High scores are saved per player name, on this device only (names never go to analytics)
+let board = [];
+try { board = JSON.parse(store('localStorage', 'babykeys-board') || '[]').filter(r => r && typeof r.name === 'string'); } catch { board = []; }
+let player = store('localStorage', 'babykeys-player') || '';
+const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
+const bestFor = name => Math.max(0, ...board.filter(r => sameName(r.name, name)).map(r => r.score));
+function saveBoard() {
+  board.sort((a, b) => b.score - a.score || a.at - b.at);
+  board = board.slice(0, 100);
+  store('localStorage', 'babykeys-board', JSON.stringify(board));
+}
 const floaters = [];
 let miniFlash = null, nextTargetTimer = 0;
 
 function codeFor(ch) { return /\d/.test(ch) ? 'Digit' + ch : 'Key' + ch; }
 
 function newTarget() {
-  const pool = mode === 'challenge' && game.score >= 12 ? LETTERS.concat(DIGITS) : LETTERS;
+  const pool = mode === 'challenge' && game.popped >= 12 ? LETTERS.concat(DIGITS) : LETTERS;
   let ch;
   do ch = pick(pool); while (game.target && ch === game.target.label);
   const info = keyInfo(codeFor(ch));
@@ -473,12 +519,16 @@ function newTarget() {
     label: ch, info, hue: info.hue,
     x: rand(0.25, 0.75) * W, y: rand(...yRange) * H,
     r: Math.min(W, H) * (mode === 'find' ? 0.15 : 0.13),
-    t: 0, wobble: 0, dying: false, dieT: 0,
+    t: 0, wobble: 0, dying: false, dieT: 0, lastPts: TIME_LIMIT,
   };
 }
 
+// Points for the current bubble: 5 in the first second, then one less each second, 0 after 5s
+function pointsFor(g) { return Math.max(0, TIME_LIMIT - Math.floor(Math.max(0, g.t - 0.3))); }
+
 function beginGame() {
-  game.score = 0; game.over = false; game.streak = 0; game.target = null;
+  game.score = 0; game.popped = 0; game.over = false; game.streak = 0; game.target = null; game.running = true;
+  game.best = bestFor(player);
   updateHud();
   document.getElementById('gameover').classList.remove('open');
   document.getElementById('go-again').classList.remove('show');
@@ -487,7 +537,8 @@ function beginGame() {
 }
 
 function updateHud(bump) {
-  document.getElementById('hud').classList.toggle('show', mode === 'challenge' && started);
+  document.getElementById('hud').classList.toggle('show', mode === 'challenge' && started && game.running);
+  document.getElementById('hud-name').textContent = player;
   const sc = document.getElementById('score'), be = document.getElementById('best');
   sc.textContent = game.score; be.textContent = game.best;
   if (bump) { sc.classList.remove('bump'); void sc.offsetWidth; sc.classList.add('bump'); }
@@ -512,12 +563,13 @@ function hitTarget(k) {
   tintBackground(g.hue);
   shake = Math.max(shake, 7);
   if (mode === 'challenge') {
-    game.score++;
-    const isBest = game.score > game.best;
-    if (isBest) { game.best = game.score; store('sessionStorage', 'babykeys-best', game.best); }
+    const pts = pointsFor(g);
+    game.score += pts;
+    game.popped++;
+    if (game.score > game.best) game.best = game.score;
     updateHud(true);
-    floater('+1', g.x, g.y - g.r * 0.4, g.hue, 1.2);
-    if (game.score % 10 === 0) { rainbowBlast(); floater(`${game.score}!`, W / 2, H * 0.4, 50, 2); }
+    floater(pts === TIME_LIMIT ? '+5 Speedy!' : `+${pts}`, g.x, g.y - g.r * 0.4, pts ? g.hue : 220, pts === TIME_LIMIT ? 1.1 : 1.2);
+    if (game.popped % 10 === 0) { rainbowBlast(); floater(`${game.popped} popped!`, W / 2, H * 0.4, 50, 1.6); }
   } else {
     floater(pick(CHEERS), g.x, g.y - g.r * 0.4, g.hue);
     if (stats.hits % 5 === 0) rainbowBlast();
@@ -554,34 +606,91 @@ function gameOver() {
   shake = 12;
 
   const s = game.score;
-  const prevBest = Math.max(0, ...game.scores);
+  game.running = false;
+  const prevBest = bestFor(player);
+  const prevTop = Math.max(0, ...board.map(r => r.score));
+  const entry = { name: player, score: s, at: Date.now() };
+  board.push(entry);
+  saveBoard();
+  const pos = board.indexOf(entry) + 1;
   const isNewBest = s > 0 && s > prevBest;
-  game.scores.push(s);
-  game.scores.sort((a, b) => b - a);
-  store('sessionStorage', 'babykeys-scores', JSON.stringify(game.scores.slice(0, 20)));
-  track('challenge_game_over', { score: s, new_high_score: isNewBest, games_this_session: game.scores.length });
+  const isTop = s > 0 && s > prevTop && board.length > 1;
+  track('challenge_game_over', { score: s, letters_popped: game.popped, new_personal_best: isNewBest, top_of_board: isTop, board_position: pos });
 
   document.getElementById('go-score').textContent = s;
-  document.getElementById('go-label').textContent = s === 1 ? 'letter popped' : 'letters popped';
+  document.getElementById('go-label').textContent = `${s === 1 ? 'point' : 'points'} · ${game.popped} popped`;
   const badge = document.getElementById('go-badge');
   badge.className = 'badge' + (isNewBest ? ' new' : '');
-  badge.textContent = isNewBest ? '★ New high score! ★' : `High score: ${game.best}`;
-  document.getElementById('go-rank').innerHTML = `<small>You are a</small>${rankFor(s)}`;
-  const board = document.getElementById('go-board');
-  board.innerHTML = '';
-  let marked = false;
-  game.scores.slice(0, 5).forEach(v => {
+  badge.textContent = isTop ? `★ Top of the board, ${player}! ★` : isNewBest ? `★ New high score, ${player}! ★` : `${player}'s best: ${bestFor(player)}`;
+  document.getElementById('go-rank').innerHTML = '<small>You are a</small>';
+  document.getElementById('go-rank').append(rankFor(s));
+  const list = document.getElementById('go-board');
+  list.innerHTML = '';
+  const row = (r, n) => {
     const li = document.createElement('li');
-    li.innerHTML = `<span>${v === s && !marked ? 'This game' : 'Earlier'}</span>${v}`;
-    if (v === s && !marked) { li.className = 'me'; marked = true; }
-    board.appendChild(li);
-  });
+    if (n) li.style.counterSet = `r ${n - 1}`;
+    const nm = document.createElement('span'); nm.textContent = r.name;
+    const sc = document.createElement('b'); sc.textContent = r.score;
+    li.append(nm, sc);
+    if (r === entry) li.className = 'me';
+    list.appendChild(li);
+  };
+  board.slice(0, 5).forEach(r => row(r));
+  if (pos > 5) {
+    const gap = document.createElement('li'); gap.className = 'gap'; gap.textContent = '···'; list.appendChild(gap);
+    row(entry, pos);
+  }
   setTimeout(() => {
     document.getElementById('gameover').classList.add('open');
-    if (isNewBest) { rainbowBlast(); }
+    if (isNewBest) rainbowBlast();
   }, 700);
   setTimeout(() => document.getElementById('go-again').classList.add('show'), 1800);
 }
+
+// ---------- Who's playing? ----------
+const playerEl = document.getElementById('player');
+const playerOpen = () => playerEl.classList.contains('open');
+function openPlayer() {
+  game.running = false; game.target = null;
+  clearTimeout(nextTargetTimer);
+  updateHud();
+  document.getElementById('gameover').classList.remove('open');
+  const input = document.getElementById('player-name');
+  input.value = player;
+  const chips = document.getElementById('player-chips');
+  chips.innerHTML = '';
+  const names = [];
+  for (const r of [{ name: player }, ...board.slice().sort((a, b) => b.at - a.at)]) {
+    if (r.name && !names.some(n => sameName(n, r.name))) names.push(r.name);
+  }
+  names.slice(0, 6).forEach(n => {
+    const c = document.createElement('button');
+    c.type = 'button'; c.className = 'chip'; c.textContent = n;
+    c.addEventListener('click', () => { input.value = n; submitPlayer(); });
+    chips.appendChild(c);
+  });
+  syncPlayerButton();
+  playerEl.classList.add('open');
+  document.body.classList.add('menu');
+  setTimeout(() => { input.focus(); input.select(); }, 50);
+}
+function syncPlayerButton() {
+  document.getElementById('player-go').disabled = !document.getElementById('player-name').value.trim();
+}
+function submitPlayer() {
+  const name = document.getElementById('player-name').value.replace(/\s+/g, ' ').trim().slice(0, 14);
+  if (!name) return;
+  player = name;
+  store('localStorage', 'babykeys-player', player);
+  playerEl.classList.remove('open');
+  document.body.classList.remove('menu');
+  document.activeElement?.blur?.();
+  initAudio();
+  beginGame();
+}
+document.getElementById('player-name').addEventListener('input', syncPlayerButton);
+document.getElementById('player-form').addEventListener('submit', e => { e.preventDefault(); submitPlayer(); });
+document.getElementById('go-player').addEventListener('click', openPlayer);
 
 // ---------- Settings ----------
 const settingsEl = document.getElementById('settings');
@@ -606,6 +715,8 @@ function closeSettings() {
   settingsEl.classList.remove('open');
   document.body.classList.remove('menu');
   document.activeElement?.blur?.();
+  if (!started) return start();
+  if (mode === 'challenge' && !game.running && !game.over) openPlayer();
 }
 function setMode(m) {
   if (m === mode) return;
@@ -618,12 +729,13 @@ function setMode(m) {
   game.target = null;
   clearTimeout(nextTargetTimer);
   document.getElementById('gameover').classList.remove('open');
-  if (started && mode !== 'free') beginGame();
+  game.running = false; game.over = false;
+  if (started && mode === 'find') beginGame();
   updateHud();
 }
 document.getElementById('gear').addEventListener('click', openSettings);
 document.querySelectorAll('.mode').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
-document.getElementById('play').addEventListener('click', () => { closeSettings(); start(); });
+document.getElementById('play').addEventListener('click', closeSettings);
 settingsEl.addEventListener('pointerdown', e => { if (e.target === settingsEl) closeSettings(); });
 syncModeButtons();
 
@@ -648,7 +760,8 @@ function start() {
   document.getElementById('intro').classList.add('gone');
   const el = document.documentElement;
   (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)?.catch?.(() => {});
-  if (mode !== 'free') beginGame();
+  if (mode === 'find') beginGame();
+  if (mode === 'challenge') openPlayer();
   updateHud();
 }
 
@@ -678,6 +791,7 @@ addEventListener('keydown', e => {
     if (e.code === 'Escape') closeSettings();
     return;                               // let Tab/Enter/Space work normally in the menu
   }
+  if (playerOpen()) return;               // typing a name
   e.preventDefault();
   if (e.code === 'Escape') return;       // let the browser exit full screen
   const wasStarted = started;
@@ -695,6 +809,7 @@ addEventListener('keydown', e => {
     if (performance.now() - game.overAt > 1800) beginGame();
     return;
   }
+  if (mode === 'challenge' && !game.running) { openPlayer(); return; }
   if (!k) {                               // Space, arrows etc. don't count as wrong
     if (!MODIFIERS.test(e.code)) addPart({ kind: 'twinkle', x: rand(0.2, 0.8) * W, y: rand(0.2, 0.8) * H, vx: 0, vy: -20, hue: rand(0, 360), size: 9, t: 0, life: 0.6, drag: 0.2, g: 0 });
     return;
@@ -707,6 +822,7 @@ addEventListener('keydown', e => {
 
 addEventListener('pointerdown', e => {
   if (e.target.closest('#gear, .overlay')) return;
+  if (playerOpen()) return;
   start();
   lastPress = performance.now();
   stats.taps++;
@@ -734,140 +850,224 @@ addEventListener('pointermove', e => {
 addEventListener('beforeunload', e => { if (started) { e.preventDefault(); e.returnValue = ''; } });
 addEventListener('contextmenu', e => e.preventDefault());
 
-// ---------- Drawing helpers ----------
-function shapePath(s, r) {
-  ctx.beginPath();
-  if (s === 'circle') ctx.arc(0, 0, r, 0, TAU);
-  else if (s === 'square') ctx.roundRect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7, r * 0.38);
-  else if (s === 'triangle') {
-    const pts = [0, 1, 2].map(i => { const a = -Math.PI / 2 + i * TAU / 3; return [Math.cos(a) * r * 1.2, Math.sin(a) * r * 1.2 + r * 0.2]; });
-    // rounded corners
-    for (let i = 0; i < 3; i++) {
-      const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % 3];
-      if (i === 0) ctx.moveTo((x1 + x2) / 2, (y1 + y2) / 2);
-      const [x3, y3] = pts[(i + 2) % 3];
-      ctx.arcTo(x2, y2, (x2 + x3) / 2, (y2 + y3) / 2, r * 0.25);
-    }
-    ctx.closePath();
-  }
-  else if (s === 'star') {
-    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.58 : r * 1.18; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
-    ctx.closePath(); ctx.lineJoin = 'round';
-  }
-  else if (s === 'heart') {
-    for (let t = 0; t < TAU; t += 0.08) { const x = 16 * Math.sin(t) ** 3, y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t); ctx.lineTo(x * r / 15, -y * r / 15 - r * 0.1); }
-    ctx.closePath();
-  }
-  else if (s === 'flower') {
-    for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3, cx = Math.cos(a) * r * 0.6, cy = Math.sin(a) * r * 0.6; ctx.moveTo(cx + r * 0.46, cy); ctx.arc(cx, cy, r * 0.46, 0, TAU); }
-    ctx.moveTo(r * 0.6, 0); ctx.arc(0, 0, r * 0.6, 0, TAU);
-  }
-}
-const CENTER_Y = { triangle: 0.28, heart: -0.02 };
+// ---------- Drawing: "cozy doodles" style ----------
+// Soft sky-blue field, wobbly hand-drawn cream linework, a few solid cream fills, one buttery-yellow accent.
+const SKY = '#6c9dd2', SKY_DEEP = '#4f80b8', CREAM = '#f7e8c4', YELLOW = '#f6c94f';
+const SERIF = '"Fraunces Variable", Fraunces, Georgia, serif';
+const creamA = a => `rgba(247,232,196,${a})`;
 
-// Springy scale: 0 -> overshoot -> settle at 1
 const spring = t => t <= 0 ? 0 : 1 - Math.exp(-7 * t) * Math.cos(15 * t);
 const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+const hash = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const wob = (seed, i, amt) => {
+  const a = hash(seed * 1.7) * TAU, b = hash(seed * 2.9 + 1) * TAU;
+  return amt * (0.6 * Math.sin(i * 0.23 + a) + 0.3 * Math.sin(i * 0.61 + b) + 0.25 * (hash(seed * 13.37 + i * 7.13) - 0.5));
+};
+let boil = 0;                              // line "boil": wobble re-drawn ~6 times a second, like hand animation
 
-function drawFace(o, r, cy) {
-  const blink = ((o.t + o.seed) % 3.2) < 0.12 ? 0.12 : 1;
-  const look = Math.sin(o.t * 1.3 + o.seed) * r * 0.04;
-  ctx.fillStyle = '#2b1838';
-  for (const sx of [-1, 1]) {
-    ctx.beginPath(); ctx.ellipse(sx * r * 0.28 + look, cy - r * 0.08, r * 0.09, r * 0.13 * blink, 0, 0, TAU); ctx.fill();
+// Unit outlines for each shape (sampled points, radius ~1)
+function sampleEdges(verts, n) {
+  const pts = [], L = verts.length;
+  for (let i = 0; i < n; i++) {
+    const f = (i / n) * L, k = Math.floor(f), u = f - k;
+    const [x1, y1] = verts[k % L], [x2, y2] = verts[(k + 1) % L];
+    pts.push([x1 + (x2 - x1) * u, y1 + (y2 - y1) * u]);
   }
-  if (blink === 1) {
-    ctx.fillStyle = '#fff';
-    for (const sx of [-1, 1]) { ctx.beginPath(); ctx.arc(sx * r * 0.28 + look + r * 0.03, cy - r * 0.13, r * 0.035, 0, TAU); ctx.fill(); }
-  }
-  ctx.fillStyle = 'rgba(255,120,160,.45)';
-  for (const sx of [-1, 1]) { ctx.beginPath(); ctx.ellipse(sx * r * 0.48, cy + r * 0.12, r * 0.12, r * 0.07, 0, 0, TAU); ctx.fill(); }
-  ctx.strokeStyle = '#2b1838'; ctx.lineWidth = r * 0.06; ctx.lineCap = 'round';
-  const open = o.t < 0.5 ? 1 : 0;   // "ooh!" first, then a smile
+  return pts;
+}
+const OUTLINES = (() => {
+  const N = 56, o = {};
+  o.circle = Array.from({ length: N }, (_, i) => { const a = i / N * TAU; return [Math.cos(a), Math.sin(a)]; });
+  o.cloud = Array.from({ length: N }, (_, i) => { const a = i / N * TAU, r = 0.82 + 0.2 * Math.abs(Math.sin(a * 3.5 + 0.4)); return [Math.cos(a) * r * 1.15, Math.sin(a) * r * 0.9]; });
+  o.flower = Array.from({ length: N }, (_, i) => { const a = i / N * TAU, r = 0.72 + 0.32 * Math.pow(Math.abs(Math.cos(a * 3)), 0.6); return [Math.cos(a) * r, Math.sin(a) * r]; });
+  o.square = Array.from({ length: N }, (_, i) => { const a = i / N * TAU, c = Math.cos(a), s = Math.sin(a); return [Math.sign(c) * Math.pow(Math.abs(c), 0.45) * 0.88, Math.sign(s) * Math.pow(Math.abs(s), 0.45) * 0.88]; });
+  o.star = sampleEdges(Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.55 : 1.15; return [Math.cos(a) * r, Math.sin(a) * r]; }), N);
+  o.triangle = sampleEdges([0, 1, 2].map(i => { const a = -Math.PI / 2 + i * TAU / 3; return [Math.cos(a) * 1.15, Math.sin(a) * 1.15 + 0.2]; }), N);
+  o.heart = Array.from({ length: N }, (_, i) => { const t = i / N * TAU; return [16 * Math.sin(t) ** 3 / 15, -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) / 15 - 0.1]; });
+  return o;
+})();
+const SHAPE_LIST = Object.keys(OUTLINES);
+
+// Transform unit points to screen with a hand-drawn wobble
+function place(pts, x, y, r, sx, sy, rot, seed, amt) {
+  const c = Math.cos(rot), s = Math.sin(rot);
+  return pts.map(([px, py], i) => {
+    const ux = (px + wob(seed, i * 2, amt)) * r * sx, uy = (py + wob(seed, i * 2 + 1, amt)) * r * sy;
+    return [x + ux * c - uy * s, y + ux * s + uy * c];
+  });
+}
+function smoothClosed(P) {
+  const n = P.length;
   ctx.beginPath();
-  if (open) { ctx.fillStyle = '#2b1838'; ctx.ellipse(0, cy + r * 0.2, r * 0.09, r * 0.11, 0, 0, TAU); ctx.fill(); }
-  else { ctx.arc(0, cy + r * 0.08, r * 0.2, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke(); }
+  ctx.moveTo((P[n - 1][0] + P[0][0]) / 2, (P[n - 1][1] + P[0][1]) / 2);
+  for (let i = 0; i < n; i++) { const a = P[i], b = P[(i + 1) % n]; ctx.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); }
+  ctx.closePath();
 }
-
-function drawPop(o) {
-  const t = o.t, r = o.r;
-  const s = spring(t);
-  const wob = Math.exp(-5 * t) * Math.sin(18 * t) * 0.22;
-  let sx = s * (1 + wob), sy = s * (1 - wob), alpha = 1;
-  const k = (t - (o.life - 0.45)) / 0.45;
-  if (k > 0) {
-    if (k < 0.6) { const e = 1 + 0.18 * Math.sin((k / 0.6) * Math.PI / 2); sx *= e; sy *= e; }
-    else {
-      if (!o.popped) { o.popped = true; puff(o, sx); }
-      const e = 1.18 * (1 - easeOutCubic((k - 0.6) / 0.4)); sx *= e; sy *= e; alpha = 1 - (k - 0.6) / 0.4;
-    }
+// A sketchy stroke: starts part-way round and overshoots the join a little, like a pen line
+function sketchStroke(P, start, lw, color) {
+  const n = P.length, over = 4;
+  ctx.beginPath();
+  for (let j = 0; j <= n + over; j++) {
+    const a = P[(start + j) % n];
+    const drift = j > n ? (j - n) * lw * 0.35 : 0;
+    const nx = a[0] + drift, ny = a[1] - drift * 0.5;
+    if (j === 0) ctx.moveTo(nx, ny);
+    else { const b = P[(start + j - 1) % n]; ctx.quadraticCurveTo(b[0], b[1], (b[0] + nx) / 2, (b[1] + ny) / 2); }
   }
-  sx = Math.max(sx, 0.001); sy = Math.max(sy, 0.001);
-  const x = o.x + Math.sin(t * 1.7 + o.seed) * 6, y = o.y + Math.sin(t * 2.3 + o.seed) * 5;
-
-  // soft glow
-  ctx.globalCompositeOperation = 'lighter';
-  const gr = r * 2.2 * sx;
-  const g = ctx.createRadialGradient(x, y, 0, x, y, gr);
-  g.addColorStop(0, `hsla(${o.hue},100%,60%,${0.4 * alpha})`);
-  g.addColorStop(1, `hsla(${o.hue},100%,60%,0)`);
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, gr, 0, TAU); ctx.fill();
-  ctx.globalCompositeOperation = 'source-over';
-
-  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.stroke();
+}
+function doodle(shape, x, y, r, { sx = 1, sy = 1, rot = 0, seed = 1, fill = null, line = CREAM, lw = 3, alpha = 1, amt = 0.03 } = {}) {
+  const pts = OUTLINES[shape];
   ctx.globalAlpha = alpha;
-  ctx.translate(x, y);
-  ctx.rotate(o.rot + Math.sin(t * 2 + o.seed) * 0.08);
-  ctx.scale(sx, sy);
-
-  // drop shadow
-  ctx.save(); ctx.translate(0, r * 0.12); ctx.fillStyle = `hsla(${o.hue},80%,15%,.35)`; shapePath(o.shape, r); ctx.fill(); ctx.restore();
-
-  // glossy body
-  const f = ctx.createRadialGradient(-r * 0.35, -r * 0.45, r * 0.05, 0, 0, r * 1.3);
-  f.addColorStop(0, `hsl(${o.hue},100%,82%)`);
-  f.addColorStop(0.5, `hsl(${o.hue},92%,62%)`);
-  f.addColorStop(1, `hsl(${o.hue},85%,44%)`);
-  ctx.fillStyle = f; shapePath(o.shape, r); ctx.fill();
-  if (o.shape !== 'flower') { ctx.lineWidth = r * 0.05; ctx.strokeStyle = `hsla(${o.hue},100%,92%,.45)`; ctx.stroke(); }
-
-  // shine
-  ctx.fillStyle = 'rgba(255,255,255,.45)';
-  ctx.beginPath(); ctx.ellipse(-r * 0.36, -r * 0.44, r * 0.2, r * 0.1, -0.6, 0, TAU); ctx.fill();
-  ctx.beginPath(); ctx.arc(-r * 0.1, -r * 0.58, r * 0.045, 0, TAU); ctx.fill();
-
-  const cy = (CENTER_Y[o.shape] || 0.02) * r;
-  if (o.label) {
-    const ls = spring(t - 0.07);
-    ctx.save();
-    ctx.translate(0, cy);
-    ctx.rotate(Math.sin(t * 9) * 0.12 * Math.exp(-2 * t));
-    ctx.scale(Math.max(ls, 0.001), Math.max(ls, 0.001));
-    const fs = r * (o.shape === 'triangle' ? 0.8 : 1.02);
-    ctx.font = `900 ${fs}px ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = `hsl(${o.hue},75%,30%)`;
-    ctx.fillText(o.label, 0, fs * 0.1);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(o.label, 0, fs * 0.04);
-    ctx.restore();
-  } else if (o.face) {
-    drawFace(o, r, cy);
-  }
-  ctx.restore();
+  if (fill) { smoothClosed(place(pts, x, y, r, sx, sy, rot, seed + 99, amt * 0.6)); ctx.fillStyle = fill; ctx.fill(); }
+  const P = place(pts, x, y, r, sx, sy, rot, seed + boil, amt);
+  sketchStroke(P, Math.floor(hash(seed) * pts.length), lw, line);
+  // a lighter second pass for that scratchy pen feel
+  sketchStroke(place(pts, x, y, r * 1.015, sx, sy, rot, seed + boil + 50, amt * 1.4), Math.floor(hash(seed + 3) * pts.length), lw * 0.45, line === CREAM ? creamA(0.55) : line);
+  ctx.globalAlpha = 1;
+}
+function wobblyCircle(x, y, r, lw, color, seed, amt = 0.035) {
+  amt = Math.min(amt, 6 / Math.max(r, 1));   // keep the wobble a few pixels, however big the circle
+  sketchStroke(place(OUTLINES.circle, x, y, r, 1, 1, 0, seed + boil, amt), Math.floor(hash(seed) * 56), lw, color);
 }
 
-function drawTwinkle(x, y, s) {
+// Line-drawn face: happy closed eyes (or open dots), little smile, hatched blush
+function drawFace(x, y, r, color, t, seed) {
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineCap = 'round';
+  ctx.lineWidth = Math.max(2, r * 0.06);
+  const sleepy = hash(seed) > 0.4;
+  const blink = ((t + seed) % 3.4) < 0.12;
+  for (const s of [-1, 1]) {
+    const ex = x + s * r * 0.3, ey = y - r * 0.08;
+    ctx.beginPath();
+    if (sleepy || blink) ctx.arc(ex, ey + r * 0.04, r * 0.1, Math.PI * 1.15, Math.PI * 1.85);
+    else { ctx.arc(ex, ey, r * 0.065, 0, TAU); ctx.fill(); continue; }
+    ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(x, y + r * 0.06, r * 0.2, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  ctx.lineWidth = Math.max(1.2, r * 0.03);
+  for (const s of [-1, 1]) for (let k = 0; k < 3; k++) {
+    const bx = x + s * r * 0.5 + (k - 1) * r * 0.07, by = y + r * 0.1;
+    ctx.beginPath(); ctx.moveTo(bx - r * 0.025, by + r * 0.04); ctx.lineTo(bx + r * 0.025, by - r * 0.04); ctx.stroke();
+  }
+}
+
+function drawStar(x, y, s, color) {        // the little four-point sparkle from the poster
+  ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(x, y - s);
-  ctx.quadraticCurveTo(x, y, x + s, y);
-  ctx.quadraticCurveTo(x, y, x, y + s);
-  ctx.quadraticCurveTo(x, y, x - s, y);
-  ctx.quadraticCurveTo(x, y, x, y - s);
+  ctx.quadraticCurveTo(x + s * 0.12, y - s * 0.12, x + s, y);
+  ctx.quadraticCurveTo(x + s * 0.12, y + s * 0.12, x, y + s);
+  ctx.quadraticCurveTo(x - s * 0.12, y + s * 0.12, x - s, y);
+  ctx.quadraticCurveTo(x - s * 0.12, y - s * 0.12, x, y - s);
   ctx.fill();
 }
 
-// The letter bubble for Find the letter / Challenge
+function serif(size, weight = 600, italic = false) { return `${italic ? 'italic ' : ''}${weight} ${size}px ${SERIF}`; }
+
+// ---------- Pops (free play shapes) ----------
+function drawPop(o) {
+  const t = o.t, r = o.r;
+  if (!o.look) {                            // mostly open cream outlines, some solid cream, the odd yellow one
+    const roll = hash(o.seed * 3.1);
+    o.look = roll < 0.55 ? 'line' : roll < 0.83 ? 'cream' : 'yellow';
+    o.shape = SHAPE_LIST[Math.floor(hash(o.seed * 7.7) * SHAPE_LIST.length)];
+  }
+  const s = spring(t);
+  const w = Math.exp(-5 * t) * Math.sin(18 * t) * 0.22;
+  let sx = s * (1 + w), sy = s * (1 - w), alpha = 1;
+  const k = (t - (o.life - 0.45)) / 0.45;
+  if (k > 0) {
+    if (k < 0.6) { const e = 1 + 0.15 * Math.sin((k / 0.6) * Math.PI / 2); sx *= e; sy *= e; }
+    else {
+      if (!o.popped) { o.popped = true; puff(o, sx); }
+      const e = 1.15 * (1 - easeOutCubic((k - 0.6) / 0.4)); sx *= e; sy *= e; alpha = 1 - (k - 0.6) / 0.4;
+    }
+  }
+  if (sx < 0.01) return;
+  const x = o.x + Math.sin(t * 1.7 + o.seed) * 6, y = o.y + Math.sin(t * 2.3 + o.seed) * 5;
+  const rot = o.rot + Math.sin(t * 2 + o.seed) * 0.08;
+  const lw = Math.max(2.5, r * 0.05);
+  const fill = o.look === 'cream' ? CREAM : o.look === 'yellow' ? YELLOW : null;
+  doodle(o.shape, x, y, r, { sx, sy, rot, seed: o.seed, fill, lw, alpha });
+  ctx.globalAlpha = alpha;
+  // a little highlight stroke
+  ctx.strokeStyle = fill ? 'rgba(255,255,255,.7)' : creamA(0.8); ctx.lineWidth = lw * 0.8; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(x - r * 0.05 * sx, y - r * 0.05 * sy, r * 0.62 * Math.min(sx, sy), Math.PI * 1.1, Math.PI * 1.35); ctx.stroke();
+  const ink = fill ? SKY_DEEP : CREAM;
+  const cy = y + (o.shape === 'triangle' ? r * 0.25 : 0) * sy;
+  if (o.label) {
+    const ls = Math.max(0.001, spring(t - 0.07)) * Math.min(sx, sy);
+    ctx.save();
+    ctx.translate(x, cy); ctx.rotate(Math.sin(t * 9) * 0.12 * Math.exp(-2 * t)); ctx.scale(ls, ls);
+    const fs = r * (o.shape === 'triangle' ? 0.8 : 1.05);
+    ctx.font = serif(fs, 600); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = ink; ctx.fillText(o.label, 0, fs * 0.06);
+    ctx.restore();
+  } else if (o.face) {
+    drawFace(x, cy, r * Math.min(sx, sy), ink, t, o.seed);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ---------- Background doodles: clouds along the bottom, birds, sparkles ----------
+let clouds = [];
+function layoutClouds() {
+  clouds = [];
+  const n = Math.max(4, Math.round(W / 260));
+  for (let i = 0; i < n; i++) {
+    const r = Math.min(W, H) * rand(0.16, 0.26);
+    clouds.push({ x: (i + 0.5) / n * W + rand(-40, 40), y: H + r * rand(0.05, 0.35), r, seed: rand(1, 999), fill: i % 3 === 1, ph: rand(0, TAU) });
+  }
+  // one big friendly cloud in the corner, like the poster's oversized illustration
+  clouds.push({ x: W * 0.92, y: H * 0.98, r: Math.min(W, H) * 0.34, seed: 7, fill: true, face: true, ph: 0 });
+}
+addEventListener('resize', layoutClouds);
+layoutClouds();
+let cloudBounce = 0;
+const birds = Array.from({ length: 3 }, () => ({ x: Math.random(), y: rand(0.08, 0.35), v: rand(0.008, 0.02), s: rand(8, 14), ph: rand(0, TAU) }));
+const sparkles = Array.from({ length: 7 }, () => ({ x: Math.random(), y: rand(0.05, 0.6), s: rand(5, 11), ph: rand(0, TAU) }));
+
+function drawBackground(dt, idle) {
+  ctx.fillStyle = SKY; ctx.fillRect(0, 0, W, H);
+  // gentle paper grain
+  ctx.fillStyle = 'rgba(255,255,255,.035)';
+  for (let i = 0; i < 40; i++) { const gx = hash(i * 3.3) * W, gy = hash(i * 5.1) * H; ctx.fillRect(gx, gy, 2, 2); }
+  for (let i = flashes.length - 1; i >= 0; i--) {
+    const f = flashes[i]; f.t += dt;
+    const p = f.t / f.life;
+    if (p >= 1) { flashes.splice(i, 1); continue; }
+    const fr = Math.max(W, H) * (f.big ? 1 : 0.5) * (0.4 + p * 0.6);
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, fr);
+    g.addColorStop(0, `rgba(255,248,225,${0.22 * (1 - p)})`);
+    g.addColorStop(1, 'rgba(255,248,225,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+  for (const b of birds) {
+    b.x += b.v * dt * (idle ? 1.6 : 1);
+    if (b.x > 1.1) { b.x = -0.1; b.y = rand(0.08, 0.35); }
+    const bx = b.x * W, by = b.y * H + Math.sin(clock + b.ph) * 8, flap = Math.sin(clock * 5 + b.ph) * 0.35;
+    ctx.strokeStyle = creamA(0.85); ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(bx - b.s, by - b.s * (0.2 + flap)); ctx.quadraticCurveTo(bx - b.s * 0.4, by - b.s * 0.5, bx, by);
+    ctx.quadraticCurveTo(bx + b.s * 0.4, by - b.s * 0.5, bx + b.s, by - b.s * (0.2 + flap));
+    ctx.stroke();
+  }
+  for (const s of sparkles) {
+    const tw = 0.5 + 0.5 * Math.sin(clock * 1.5 + s.ph);
+    drawStar(s.x * W, s.y * H, s.s * (0.6 + tw * 0.4) * (idle ? 1.3 : 1), creamA(0.35 + tw * 0.5));
+  }
+  cloudBounce *= Math.pow(0.02, dt);
+  for (const c of clouds) {
+    const bob = Math.sin(clock * 0.6 + c.ph) * 6;
+    const sq = c.face ? 1 + Math.sin(clock * 14) * 0.04 * cloudBounce : 1;
+    doodle('cloud', c.x, c.y + bob, c.r, { sx: sq, sy: 2 - sq, seed: c.seed, fill: c.fill ? CREAM : null, lw: Math.max(2.5, c.r * 0.025), amt: 0.02 });
+    if (c.face) drawFace(c.x - c.r * 0.28, c.y - c.r * 0.3 + bob, c.r * 0.55, SKY_DEEP, clock, 0.2);
+  }
+}
+
+// ---------- Letter bubble (Find the letter / Challenge) ----------
 function drawTarget(g, dt) {
   g.t += dt;
   g.wobble *= Math.pow(0.03, dt);
@@ -882,70 +1082,65 @@ function drawTarget(g, dt) {
   const y = g.y + Math.sin(g.t * 1.7) * 9;
   const r = g.r * Math.max(s, 0) * hint;
   if (r < 1) return;
-  const hue = g.dying ? 0 : g.hue;
+  const lw = Math.max(3, r * 0.045);
+  ctx.fillStyle = creamA(0.12); ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+  wobblyCircle(x, y, r, lw, CREAM, 11);
+  wobblyCircle(x, y, r * 1.02, lw * 0.45, creamA(0.5), 23, 0.045);
+  ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = lw; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(x, y, r * 0.75, Math.PI * 1.08, Math.PI * 1.38); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y, r * 0.75, Math.PI * 1.46, Math.PI * 1.52); ctx.stroke();
 
-  ctx.globalCompositeOperation = 'lighter';
-  const glow = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 2);
-  glow.addColorStop(0, `hsla(${hue},100%,60%,.35)`);
-  glow.addColorStop(1, `hsla(${hue},100%,60%,0)`);
-  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, r * 2, 0, TAU); ctx.fill();
-  ctx.globalCompositeOperation = 'source-over';
+  // countdown ring + points badge (Challenge)
+  if (mode === 'challenge' && !g.dying) {
+    const el = Math.max(0, g.t - 0.3), frac = Math.max(0, 1 - el / TIME_LIMIT), pts = pointsFor(g);
+    if (pts < g.lastPts) { g.lastPts = pts; tone(pts ? 1400 : 500, { dur: 0.06, vol: 0.05 }); g.tick = 1; }
+    g.tick = (g.tick || 0) * Math.pow(0.01, dt);
+    const R = r * 1.2;
+    ctx.setLineDash([2, 9]); ctx.strokeStyle = creamA(0.5); ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    if (frac > 0) {
+      ctx.strokeStyle = YELLOW; ctx.lineWidth = lw * 1.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(x, y, R, -Math.PI / 2, -Math.PI / 2 + TAU * frac); ctx.stroke();
+    }
+    const bx = x + R * 0.72, by = y - R * 0.72, br = Math.max(18, r * 0.24) * (1 + g.tick * 0.4);
+    ctx.fillStyle = pts ? YELLOW : CREAM;
+    ctx.beginPath(); ctx.arc(bx, by, br, 0, TAU); ctx.fill();
+    wobblyCircle(bx, by, br, 2.5, CREAM, 31);
+    ctx.font = serif(br * 1.15, 700); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = SKY_DEEP; ctx.fillText(pts ? `+${pts}` : '0', bx, by + br * 0.06);
+  }
 
-  // soap-bubble body: clear middle, coloured rim
-  const body = ctx.createRadialGradient(x - r * 0.2, y - r * 0.25, r * 0.1, x, y, r);
-  body.addColorStop(0, `hsla(${hue},90%,70%,.12)`);
-  body.addColorStop(0.7, `hsla(${hue},90%,62%,.28)`);
-  body.addColorStop(1, `hsla(${hue},100%,72%,.7)`);
-  ctx.fillStyle = body; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
-  ctx.lineWidth = Math.max(2, r * 0.035);
-  ctx.strokeStyle = `hsla(${hue},100%,88%,.85)`; ctx.stroke();
-  // rainbow sheen and shine
-  ctx.lineCap = 'round';
-  ctx.lineWidth = r * 0.07;
-  ctx.strokeStyle = `hsla(${(hue + 120) % 360},100%,80%,.45)`;
-  ctx.beginPath(); ctx.arc(x, y, r * 0.84, 0.15 * Math.PI, 0.55 * Math.PI); ctx.stroke();
-  ctx.fillStyle = 'rgba(255,255,255,.7)';
-  ctx.beginPath(); ctx.ellipse(x - r * 0.42, y - r * 0.45, r * 0.2, r * 0.1, -0.7, 0, TAU); ctx.fill();
-  ctx.beginPath(); ctx.arc(x - r * 0.18, y - r * 0.64, r * 0.045, 0, TAU); ctx.fill();
-
-  const fs = r * 1.05;
-  ctx.font = `900 ${fs}px ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif`;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillStyle = `hsl(${hue},80%,28%)`;
-  ctx.fillText(g.label, x, y + fs * 0.1);
-  ctx.fillStyle = '#fff';
-  ctx.fillText(g.label, x, y + fs * 0.04);
+  const fs = r * 1.1;
+  ctx.font = serif(fs, 650); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(4, fs * 0.07); ctx.strokeStyle = CREAM;
+  ctx.strokeText(g.label, x, y + fs * 0.05);
+  ctx.fillStyle = g.dying ? CREAM : YELLOW;
+  ctx.fillText(g.label, x, y + fs * 0.05);
 }
 
-// A little keyboard at the bottom that lights up the key to press (Find the letter only)
+// ---------- Little keyboard (Find the letter) ----------
 const MINI_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'], MINI_OFFS = [0, 0.3, 0.8];
 function drawMiniKeyboard(dt, now) {
   if (miniFlash) { miniFlash.t += dt; if (miniFlash.t > 0.6) miniFlash = null; }
   const ks = Math.min(W * 0.064, H * 0.07, 54), gap = ks * 0.16;
   const totalW = 10 * ks + 9 * gap, totalH = 3 * ks + 2 * gap;
   const x0 = (W - totalW) / 2, y0 = H - totalH - Math.max(22, H * 0.045);
-  ctx.fillStyle = 'rgba(255,255,255,.05)';
+  ctx.fillStyle = 'rgba(79,128,184,.55)';
   ctx.beginPath(); ctx.roundRect(x0 - gap * 2, y0 - gap * 2, totalW + gap * 4, totalH + gap * 4, ks * 0.45); ctx.fill();
   const tgt = game.target && !game.target.dying ? game.target : null;
   const pulse = 0.5 + 0.5 * Math.sin(now / 180);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = `800 ${ks * 0.46}px ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif`;
+  ctx.font = serif(ks * 0.5, 600);
   MINI_ROWS.forEach((row, r) => [...row].forEach((ch, c) => {
     const x = x0 + (c + MINI_OFFS[r]) * (ks + gap), y = y0 + r * (ks + gap);
     const isT = tgt && tgt.label === ch;
     const isWrong = miniFlash && miniFlash.label === ch;
-    const lift = isT ? -ks * 0.12 * pulse : 0;
-    ctx.save();
-    if (isT) { ctx.shadowColor = `hsl(${tgt.hue},100%,60%)`; ctx.shadowBlur = 24; }
-    ctx.fillStyle = isT ? `hsl(${tgt.hue},95%,${55 + pulse * 10}%)`
-                  : isWrong ? `rgba(255,90,120,${0.8 * (1 - miniFlash.t / 0.6) + 0.1})`
-                  : 'rgba(255,255,255,.11)';
-    ctx.beginPath(); ctx.roundRect(x, y + lift, ks, ks, ks * 0.22); ctx.fill();
-    ctx.restore();
-    // key "edge" for a bit of depth
-    ctx.fillStyle = 'rgba(0,0,0,.18)';
-    ctx.fillRect(x + ks * 0.15, y + lift + ks - 3, ks * 0.7, 2);
-    ctx.fillStyle = isT ? '#fff' : 'rgba(255,255,255,.55)';
+    const lift = isT ? -ks * 0.14 * pulse : 0;
+    const seed = r * 10 + c;
+    const pts = place(OUTLINES.square, x + ks / 2, y + ks / 2 + lift, ks * 0.56, 1, 1, 0, seed + boil, 0.025);
+    if (isT || isWrong) { smoothClosed(pts); ctx.fillStyle = isT ? YELLOW : creamA(0.7 * (1 - miniFlash.t / 0.6) + 0.1); ctx.fill(); }
+    sketchStroke(pts, seed % 20, 2, isT ? CREAM : creamA(0.75));
+    ctx.fillStyle = isT || isWrong ? SKY_DEEP : CREAM;
     ctx.fillText(ch, x + ks / 2, y + lift + ks * 0.53);
   }));
 }
@@ -959,55 +1154,35 @@ function drawFloaters(dt) {
     ctx.save();
     ctx.globalAlpha = p > 0.6 ? 1 - (p - 0.6) / 0.4 : 1;
     ctx.translate(f.x, f.y - easeOutCubic(p) * 80);
+    ctx.rotate(-0.06);
     ctx.scale(sc, sc);
-    ctx.font = `900 ${Math.min(W, H) * 0.06}px ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", system-ui, sans-serif`;
+    ctx.font = serif(Math.min(W, H) * 0.058, 650, true);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = `hsl(${f.hue},80%,30%)`; ctx.fillText(f.text, 0, 4);
-    ctx.fillStyle = '#fff'; ctx.fillText(f.text, 0, 0);
+    ctx.fillStyle = SKY_DEEP; ctx.fillText(f.text, 3, 4);
+    ctx.fillStyle = CREAM; ctx.fillText(f.text, 0, 0);
     ctx.restore();
   }
 }
 
-// Gentle floating bokeh so the screen is never still
-const ambient = Array.from({ length: 45 }, () => ({ x: Math.random(), y: Math.random(), s: rand(1, 4), v: rand(0.01, 0.035), hue: rand(0, 360), ph: rand(0, TAU) }));
-const RAINBOW = [0, 28, 52, 130, 195, 235, 280];
+// ---------- Frame loop ----------
 let last = performance.now(), clock = 0;
+function partColor(q) { return q.color || (q.color = hash(q.size * 91.7 + q.life) < 0.25 ? YELLOW : CREAM); }
 
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now; clock += dt;
+  boil = Math.floor(clock * 6) * 17;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  // Background: deep base + drifting colour clouds
   ctx.globalCompositeOperation = 'source-over';
-  ctx.fillStyle = '#120d26';
-  ctx.fillRect(0, 0, W, H);
-  const R = Math.max(W, H) * 0.65;
-  for (const b of blobs) {
-    b.hue += (b.target - b.hue) * Math.min(1, dt * 1.5);
-    const bx = W * (0.5 + Math.sin(clock * b.ax + b.px) * 0.4), by = H * (0.5 + Math.cos(clock * b.ay + b.py) * 0.4);
-    const g = ctx.createRadialGradient(bx, by, 0, bx, by, R);
-    g.addColorStop(0, `hsla(${b.hue},75%,42%,.32)`);
-    g.addColorStop(1, `hsla(${b.hue},75%,42%,0)`);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  }
-  for (let i = flashes.length - 1; i >= 0; i--) {
-    const f = flashes[i]; f.t += dt;
-    const p = f.t / f.life;
-    if (p >= 1) { flashes.splice(i, 1); continue; }
-    const fr = Math.max(W, H) * (f.big ? 1.2 : 0.7) * (0.4 + p * 0.6);
-    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, fr);
-    g.addColorStop(0, `hsla(${f.hue},100%,65%,${0.35 * (1 - p)})`);
-    g.addColorStop(1, `hsla(${f.hue},100%,65%,0)`);
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  }
+
+  const idle = (mode === 'free' || !started) && now - lastPress > 7000;
+  drawBackground(dt, idle);
 
   // Idle attract mode: friendly faces drift in to say hi
-  const idle = (mode === 'free' || !started) && now - lastPress > 7000;
   if (idle) {
     idleTimer -= dt;
     if (idleTimer <= 0) {
       idleTimer = started ? 2.4 : 1.6;
-      burst(rand(0.12, 0.88) * W, rand(0.15, 0.85) * H, rand(0, 360), { face: true, size: 0.7, quiet: true });
+      burst(rand(0.12, 0.88) * W, rand(0.15, 0.7) * H, 0, { face: true, size: 0.7, quiet: true });
     }
   } else idleTimer = 0.8;
 
@@ -1015,47 +1190,44 @@ function frame(now) {
   shake *= Math.pow(0.004, dt);
   if (shake > 0.3) ctx.translate(rand(-shake, shake), rand(-shake, shake));
 
-  ctx.globalCompositeOperation = 'lighter';
-  for (const a of ambient) {
-    a.y -= a.v * dt * (idle ? 2 : 1);
-    if (a.y < -0.02) { a.y = 1.02; a.x = Math.random(); }
-    const tw = 0.5 + 0.5 * Math.sin(clock * 2 + a.ph);
-    ctx.fillStyle = `hsla(${a.hue},90%,70%,${(idle ? 0.45 : 0.25) * (0.5 + tw * 0.5)})`;
-    ctx.beginPath(); ctx.arc(a.x * W + Math.sin(clock * 0.7 + a.ph) * 12, a.y * H, a.s * (idle ? 1.8 : 1), 0, TAU); ctx.fill();
-  }
-
-  // Rainbow arc (spacebar)
-  ctx.globalCompositeOperation = 'source-over';
+  // Rainbow (spacebar): hand-drawn concentric arcs in cream and yellow
   for (let i = rainbows.length - 1; i >= 0; i--) {
     const rb = rainbows[i]; rb.t += dt;
     const p = rb.t / rb.life;
     if (p >= 1) { rainbows.splice(i, 1); continue; }
     const sweep = easeOutCubic(Math.min(1, rb.t / 0.9));
-    const alpha = p > 0.7 ? 1 - (p - 0.7) / 0.3 : 1;
-    const Rr = Math.min(W * 0.46, H * 0.78), band = Rr * 0.075, cx = W / 2, cyy = H * 0.98;
-    ctx.lineCap = 'round';
-    RAINBOW.forEach((h, j) => {
-      ctx.strokeStyle = `hsla(${h},95%,62%,${alpha * 0.9})`;
-      ctx.lineWidth = band * 0.92;
-      ctx.beginPath(); ctx.arc(cx, cyy, Rr - j * band, Math.PI, Math.PI + Math.PI * sweep); ctx.stroke();
-    });
-    // a sparkle at the leading tip
+    ctx.globalAlpha = p > 0.7 ? 1 - (p - 0.7) / 0.3 : 1;
+    const Rr = Math.min(W * 0.46, H * 0.78), band = Rr * 0.08, cx = W / 2, cyy = H * 0.98;
+    for (let j = 0; j < 5; j++) {
+      const rr = Rr - j * band;
+      const pts = [];
+      for (let q = 0; q <= 60 * sweep; q++) {
+        const a = Math.PI + (q / 60) * Math.PI;
+        pts.push([cx + Math.cos(a) * (rr + wob(j + boil, q, 3)), cyy + Math.sin(a) * (rr + wob(j + boil, q + 99, 3))]);
+      }
+      if (pts.length < 2) continue;
+      ctx.beginPath(); pts.forEach(([px, py], q) => q ? ctx.lineTo(px, py) : ctx.moveTo(px, py));
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      if (j === 1) { ctx.strokeStyle = YELLOW; ctx.lineWidth = band * 0.8; }
+      else { ctx.strokeStyle = CREAM; ctx.lineWidth = j === 3 ? band * 0.8 : 3; }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
     if (sweep < 1) {
-      const a = Math.PI + Math.PI * sweep, rr = Rr - 3 * band;
-      addPart({ kind: 'twinkle', x: cx + Math.cos(a) * rr, y: cyy + Math.sin(a) * rr, vx: rand(-60, 60), vy: rand(-60, 60), hue: rand(0, 360), size: rand(8, 14), t: 0, life: 0.8, drag: 0.2, g: 0 });
+      const a = Math.PI + Math.PI * sweep, rr = Rr - 2 * band;
+      addPart({ kind: 'twinkle', x: cx + Math.cos(a) * rr, y: cyy + Math.sin(a) * rr, vx: rand(-60, 60), vy: rand(-60, 60), hue: 0, size: rand(8, 14), t: 0, life: 0.8, drag: 0.2, g: 0 });
     }
   }
 
-  // Rings
-  ctx.globalCompositeOperation = 'lighter';
+  // Rings: wobbly cream circles
   for (let i = rings.length - 1; i >= 0; i--) {
     const g = rings[i]; g.t += dt;
     if (g.t < 0) continue;
     const p = g.t / g.life;
     if (p >= 1) { rings.splice(i, 1); continue; }
-    ctx.strokeStyle = `hsla(${g.hue},95%,65%,${(1 - p) * 0.9})`;
-    ctx.lineWidth = g.w * (1 - p) + 1;
-    ctx.beginPath(); ctx.arc(g.x, g.y, g.maxR * easeOutCubic(p), 0, TAU); ctx.stroke();
+    ctx.globalAlpha = (1 - p) * 0.9;
+    wobblyCircle(g.x, g.y, g.maxR * easeOutCubic(p), Math.max(1.5, g.w * 0.4 * (1 - p)), CREAM, g.maxR, 0.04);
+    ctx.globalAlpha = 1;
   }
 
   // Rockets (Enter)
@@ -1063,13 +1235,12 @@ function frame(now) {
     const r = rockets[i];
     if (r.wait > 0) { r.wait -= dt; continue; }
     r.vy += 900 * dt; r.x += r.vx * dt; r.y += r.vy * dt;
-    addPart({ kind: 'dot', x: r.x, y: r.y, vx: rand(-30, 30), vy: rand(20, 80), hue: 40, size: rand(2, 4), t: 0, life: rand(0.3, 0.6), drag: 0.3, g: 100 });
-    ctx.fillStyle = `hsl(${r.hue},100%,80%)`;
-    ctx.beginPath(); ctx.arc(r.x, r.y, 5, 0, TAU); ctx.fill();
+    addPart({ kind: 'dot', x: r.x, y: r.y, vx: rand(-30, 30), vy: rand(20, 80), hue: 40, size: rand(2, 3.5), t: 0, life: rand(0.3, 0.6), drag: 0.3, g: 100 });
+    ctx.fillStyle = CREAM; ctx.beginPath(); ctx.arc(r.x, r.y, 5, 0, TAU); ctx.fill();
     if (r.vy >= -30) { explode(r); rockets.splice(i, 1); }
   }
 
-  // Particles
+  // Particles: cream dots and little rings, pen-stroke confetti, four-point sparkles
   for (let i = parts.length - 1; i >= 0; i--) {
     const q = parts[i]; q.t += dt;
     const p = q.t / q.life;
@@ -1077,30 +1248,29 @@ function frame(now) {
     const d = Math.pow(q.drag, dt);
     q.vx *= d; q.vy = q.vy * d + q.g * dt;
     q.x += q.vx * dt; q.y += q.vy * dt;
-    const a = 1 - p * p;
+    ctx.globalAlpha = 1 - p * p;
+    const col = partColor(q);
     if (q.kind === 'dot') {
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = `hsla(${q.hue},95%,65%,${a})`;
-      ctx.beginPath(); ctx.arc(q.x, q.y, q.size * (1 - p * 0.6), 0, TAU); ctx.fill();
+      const rr = q.size * (1 - p * 0.5);
+      if (q.size > 5) { ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(q.x, q.y, rr, 0, TAU); ctx.stroke(); }
+      else { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(q.x, q.y, rr, 0, TAU); ctx.fill(); }
     } else if (q.kind === 'twinkle') {
-      ctx.globalCompositeOperation = 'lighter';
-      const tw = 0.6 + 0.4 * Math.sin(q.t * 18 + q.size);
-      ctx.fillStyle = `hsla(${q.hue},100%,85%,${a * tw})`;
-      drawTwinkle(q.x, q.y, q.size * (p < 0.2 ? p / 0.2 : 1) * tw);
+      const tw = 0.7 + 0.3 * Math.sin(q.t * 14 + q.size);
+      drawStar(q.x, q.y, q.size * (p < 0.2 ? p / 0.2 : 1) * tw, col);
     } else {
-      ctx.globalCompositeOperation = 'source-over';
       q.rot += q.vr * dt;
       q.x += Math.sin(q.t * 4 + q.size) * 30 * dt;
-      ctx.save();
-      ctx.translate(q.x, q.y); ctx.rotate(q.rot); ctx.scale(1, Math.cos(q.t * 9 + q.size));
-      ctx.fillStyle = `hsla(${q.hue},90%,${60 + Math.sin(q.t * 9) * 12}%,${a})`;
-      ctx.fillRect(-q.size / 2, -q.size / 4, q.size, q.size / 2);
-      ctx.restore();
+      const len = q.size * 0.9, ang = q.rot;
+      ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(q.x - Math.cos(ang) * len / 2, q.y - Math.sin(ang) * len / 2);
+      ctx.quadraticCurveTo(q.x + Math.sin(ang) * len * 0.25, q.y - Math.cos(ang) * len * 0.25, q.x + Math.cos(ang) * len / 2, q.y + Math.sin(ang) * len / 2);
+      ctx.stroke();
     }
   }
+  ctx.globalAlpha = 1;
 
   // Shapes on top
-  ctx.globalCompositeOperation = 'source-over';
   for (let i = pops.length - 1; i >= 0; i--) {
     const o = pops[i]; o.t += dt;
     o.y -= 14 * dt;
@@ -1113,7 +1283,9 @@ function frame(now) {
 
   requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+// Draw once the fonts are ready so letters don't flash in a fallback font
+(document.fonts?.load ? Promise.all([document.fonts.load(serif(40, 600)), document.fonts.load(serif(40, 650, true))]).catch(() => {}) : Promise.resolve())
+  .finally(() => requestAnimationFrame(frame));
 </script>
 </body>
 </html>
